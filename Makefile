@@ -17,3 +17,10 @@ build: ## Build the app
 .PHONY: run
 run: ## Run the app on the host
 	go run ./...
+
+.PHONY: check
+check: ## Run checks: tidy, vet, test, lint
+	go mod tidy -diff
+	go vet ./...
+	go tool gotestsum --format dots-v2 --format-hide-empty-pkg -- ./...
+	golangci-lint run

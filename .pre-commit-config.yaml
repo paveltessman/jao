@@ -9,3 +9,12 @@ repos:
       - id: check-merge-conflict
       - id: mixed-line-ending
         args: [--fix=lf]
+
+  - repo: local
+    hooks:
+      - id: make-check
+        name: make check
+        entry: make check
+        language: system
+        pass_filenames: false
+        files: '(\.go$|\.sql$|^go\.(mod|sum)$|^sqlc\.yaml$)'

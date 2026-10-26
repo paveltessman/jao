@@ -28,8 +28,17 @@ func main() {
 
 	inst := installer.New(ctrSvc, cfg.WorkDir)
 
-	err = inst.InstallAwg(context.Background(), installer.DefaultAwgConfig())
+	awgCfg := installer.DefaultAwgConfig()
+	err = inst.InstallAwg(context.Background(), awgCfg)
 	if err != nil {
 		fmt.Println(err)
+		return
 	}
+
+	clientConf, err := inst.AddAwgPeer(context.Background(), awgCfg, cfg.PublicHost)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Print(clientConf)
 }

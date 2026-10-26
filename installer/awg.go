@@ -1,16 +1,30 @@
 package installer
 
 import (
+	"crypto/ecdh"
 	cryptorand "crypto/rand"
 	"encoding/base64"
+	"errors"
+	"fmt"
 	"math/rand/v2"
+	"net"
+	"net/netip"
+	"regexp"
 	"strconv"
+	"strings"
 )
 
 const awgImageTag = "jao/awg:latest"
 
 // awgDataDir is the dir in the container with the server keys and awg0.conf.
 const awgDataDir = "/opt/amnezia/awg"
+
+// Files that configure_container.sh makes in awgDataDir.
+const (
+	awgConfPath            = awgDataDir + "/awg0.conf"
+	awgServerPublicKeyPath = awgDataDir + "/wireguard_server_public_key.key"
+	awgPskPath             = awgDataDir + "/wireguard_psk.key"
+)
 
 // AwgConfig holds the parameters of an AmneziaWG 3.1 server.
 // The defaults and the env names come from the Amnezia client,
@@ -135,9 +149,124 @@ func (c AwgConfig) spec(hostDataDir string) ContainerSpec {
 // genKey makes a key in the same format as `awg genkey`:
 // a clamped Curve25519 private key in base64.
 func genKey() string {
+	return base64.StdEncoding.EncodeToString(newPrivateKey())
+}
+
+// genKeyPair makes a client key pair in base64,
+// the same as `awg genkey` and `awg pubkey`.
+func genKeyPair() (private, public string, err error) {
+	key, err := ecdh.X25519().NewPrivateKey(newPrivateKey())
+	if err != nil {
+		return "", "", fmt.Errorf("installer: can't make a key pair: %w", err)
+	}
+	enc := base64.StdEncoding
+	return enc.EncodeToString(key.Bytes()), enc.EncodeToString(key.PublicKey().Bytes()), nil
+}
+
+func newPrivateKey() []byte {
 	key := make([]byte, 32)
 	_, _ = cryptorand.Read(key)
 	key[0] &= 248
 	key[31] = (key[31] & 127) | 64
-	return base64.StdEncoding.EncodeToString(key)
+	return key
+}
+
+var ErrSubnetFull = errors.New("installer: no free IP in the subnet")
+
+var allowedIPRe = regexp.MustCompile(`(?m)^\s*AllowedIPs\s*=\s*(\d+\.\d+\.\d+\.\d+)`)
+
+// nextPeerIP returns the lowest IP in the subnet that no peer in serverConf uses.
+// The server uses the network address, so the search starts after it.
+// The broadcast address is never given to a peer.
+func nextPeerIP(serverConf string, subnetIP string, subnetCIDR int) (netip.Addr, error) {
+	addr, err := netip.ParseAddr(subnetIP)
+	if err != nil {
+		return netip.Addr{}, fmt.Errorf("installer: bad subnet IP %q: %w", subnetIP, err)
+	}
+	subnet, err := addr.Prefix(subnetCIDR)
+	if err != nil {
+		return netip.Addr{}, fmt.Errorf("installer: bad subnet %s/%d: %w", subnetIP, subnetCIDR, err)
+	}
+
+	used := map[netip.Addr]bool{}
+	for _, m := range allowedIPRe.FindAllStringSubmatch(serverConf, -1) {
+		if ip, err := netip.ParseAddr(m[1]); err == nil {
+			used[ip] = true
+		}
+	}
+
+	for ip := subnet.Addr().Next(); subnet.Contains(ip.Next()); ip = ip.Next() {
+		if !used[ip] {
+			return ip, nil
+		}
+	}
+	return netip.Addr{}, fmt.Errorf("%w: %s", ErrSubnetFull, subnet)
+}
+
+// Client config defaults from the Amnezia client.
+const (
+	awgClientDNS        = "1.1.1.1, 1.0.0.1"
+	awgClientAllowedIPs = "0.0.0.0/0, ::/0"
+	awgClientKeepalive  = "25-35"
+)
+
+// awgClient holds the per-peer values of a client config.
+type awgClient struct {
+	PrivateKey      string
+	IP              netip.Addr
+	ServerPublicKey string
+	PresharedKey    string
+}
+
+// clientConfig makes the config that the user imports into the AmneziaVPN app.
+// It has the layout of server_scripts/awg/template.conf in the Amnezia client.
+// A line with an empty value is dropped, because each AWG parameter is optional.
+func (c AwgConfig) clientConfig(cl awgClient, endpointHost string) string {
+	iface := [][2]string{
+		{"Address", cl.IP.String() + "/32"},
+		{"DNS", awgClientDNS},
+		{"PrivateKey", cl.PrivateKey},
+		{"Jc", strconv.Itoa(c.JunkPacketCount)},
+		{"Jmin", strconv.Itoa(c.JunkPacketMinSize)},
+		{"Jmax", strconv.Itoa(c.JunkPacketMaxSize)},
+		{"S1", strconv.Itoa(c.InitPacketJunkSize)},
+		{"S2", strconv.Itoa(c.ResponsePacketJunkSize)},
+		{"S3", strconv.Itoa(c.CookieReplyPacketJunkSize)},
+		{"S4", strconv.Itoa(c.TransportPacketJunkSize)},
+		{"H1", c.InitPacketMagicHeader},
+		{"H2", c.ResponsePacketMagicHeader},
+		{"H3", c.UnderloadPacketMagicHeader},
+		{"H4", c.TransportPacketMagicHeader},
+		{"I1", c.SpecialJunk1},
+		{"HeaderProtectionKey", c.HeaderProtectionKey},
+		{"RekeyAfterTime", c.RekeyAfterTime},
+		{"RekeyTimeout", c.RekeyTimeout},
+		{"RejectAfterTime", c.RejectAfterTime},
+		{"KeepaliveTimeout", c.KeepaliveTimeout},
+		{"MaxHandshakeAttempts", c.MaxHandshakeAttempts},
+		{"RandomTrailers", c.RandomTrailers},
+		{"DisableCookies", c.DisableCookies},
+	}
+	peer := [][2]string{
+		{"PublicKey", cl.ServerPublicKey},
+		{"PresharedKey", cl.PresharedKey},
+		{"AllowedIPs", awgClientAllowedIPs},
+		{"Endpoint", net.JoinHostPort(endpointHost, strconv.Itoa(int(c.Port)))},
+		{"PersistentKeepalive", awgClientKeepalive},
+	}
+
+	var b strings.Builder
+	writeSection(&b, "Interface", iface)
+	b.WriteString("\n")
+	writeSection(&b, "Peer", peer)
+	return b.String()
+}
+
+func writeSection(b *strings.Builder, name string, lines [][2]string) {
+	fmt.Fprintf(b, "[%s]\n", name)
+	for _, l := range lines {
+		if l[1] != "" {
+			fmt.Fprintf(b, "%s = %s\n", l[0], l[1])
+		}
+	}
 }

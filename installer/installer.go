@@ -2,7 +2,10 @@ package installer
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
+	"os"
+	"path/filepath"
 
 	"github.com/paveltessman/jao/installer/internal/workdir"
 )
@@ -54,27 +57,34 @@ const (
 )
 
 type Service struct {
-	ctr ContainerAPI
+	ctr     ContainerAPI
+	workDir string
 }
 
-func New(ctr ContainerAPI) *Service {
-	svc := Service{ctr}
+func New(ctr ContainerAPI, workDir string) *Service {
+	svc := Service{ctr, workDir}
 	return &svc
 }
 
-func (s *Service) InstallAwg(ctx context.Context) error {
-	imageTag := "awg:test"
+// InstallAwg builds the AWG image and starts a container from cfg.
+// The server keys stay in <workDir>/<cfg.Name> on the host.
+func (s *Service) InstallAwg(ctx context.Context, cfg AwgConfig) error {
 	workdir, err := workdir.FS(workdir.AWG)
 	if err != nil {
 		return err
 	}
 
-	err = s.ctr.ImageBuild(ctx, workdir, imageTag)
+	dataDir, err := s.dataDir(cfg.Name)
 	if err != nil {
 		return err
 	}
 
-	ctrID, err := s.ctr.ContainerCreate(ctx, ContainerSpec{Image: imageTag})
+	err = s.ctr.ImageBuild(ctx, workdir, awgImageTag)
+	if err != nil {
+		return err
+	}
+
+	ctrID, err := s.ctr.ContainerCreate(ctx, cfg.spec(dataDir))
 	if err != nil {
 		return err
 	}
@@ -85,4 +95,19 @@ func (s *Service) InstallAwg(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// dataDir creates the host dir for a container and returns its absolute path.
+// Docker needs an absolute path for a bind mount.
+func (s *Service) dataDir(name string) (string, error) {
+	dir, err := filepath.Abs(filepath.Join(s.workDir, name))
+	if err != nil {
+		return "", fmt.Errorf("installer: can't resolve data dir for %s: %w", name, err)
+	}
+
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", fmt.Errorf("installer: can't create data dir %s: %w", dir, err)
+	}
+
+	return dir, nil
 }

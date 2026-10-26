@@ -19,6 +19,13 @@ const awgImageTag = "jao/awg:latest"
 // awgDataDir is the dir in the container with the server keys and awg0.conf.
 const awgDataDir = "/opt/amnezia/awg"
 
+// Files that configure_container.sh makes in awgDataDir.
+const (
+	awgConfPath            = awgDataDir + "/awg0.conf"
+	awgServerPublicKeyPath = awgDataDir + "/wireguard_server_public_key.key"
+	awgPskPath             = awgDataDir + "/wireguard_psk.key"
+)
+
 // AwgConfig holds the parameters of an AmneziaWG 3.1 server.
 // The defaults and the env names come from the Amnezia client,
 // see client/core/installers/awgInstaller.cpp in amnezia-vpn/amnezia-client.

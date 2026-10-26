@@ -3,13 +3,21 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/paveltessman/jao/container"
 	"github.com/paveltessman/jao/installer"
+	"github.com/paveltessman/jao/settings"
 )
 
 func main() {
-	ctrSvc, _ := container.New()
+	cfg := settings.New()
+
+	ctrSvc, err := container.New()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 	defer func() {
 		if err := ctrSvc.Close(); err != nil {
 			fmt.Println(err)
@@ -18,9 +26,9 @@ func main() {
 	result, err := ctrSvc.Ping(context.Background())
 	fmt.Printf("ping: %s, err: %v\n", result, err)
 
-	inst := installer.New(ctrSvc)
+	inst := installer.New(ctrSvc, cfg.WorkDir)
 
-	err = inst.InstallAwg(context.Background())
+	err = inst.InstallAwg(context.Background(), installer.DefaultAwgConfig())
 	if err != nil {
 		fmt.Println(err)
 	}

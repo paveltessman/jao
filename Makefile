@@ -18,11 +18,14 @@ build: ## Build the app
 run: ## Run the app on the host
 	go run ./...
 
-.PHONY: check
-check: ## Run checks: tidy, vet, test, lint
+.PHONY: check-no-lint
+check-no-lint: ## Run checks without lint: tidy, vet, test - for CI
 	go mod tidy -diff
 	go vet ./...
 	go tool gotestsum --format dots-v2 --format-hide-empty-pkg -- ./...
+
+.PHONY: check
+check: check-no-lint ## Run checks: tidy, vet, test, lint
 	golangci-lint run
 
 .PHONY: test-integration

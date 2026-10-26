@@ -5,6 +5,9 @@
 echo "Container startup"
 #ifconfig eth0:0 $SERVER_IP_ADDRESS netmask 255.255.255.255 up
 
+# make the server keys and config on the first start only
+if [ ! -f /opt/amnezia/awg/awg0.conf ]; then bash /opt/amnezia/configure_container.sh; fi
+
 # kill daemons in case of restart
 awg-quick down /opt/amnezia/awg/awg0.conf
 

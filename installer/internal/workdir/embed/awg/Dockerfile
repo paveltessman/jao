@@ -7,8 +7,8 @@ RUN apk add --no-cache bash curl dumb-init
 RUN apk --update upgrade --no-cache
 
 RUN mkdir -p /opt/amnezia
-RUN echo -e "#!/bin/bash\ntail -f /dev/null" > /opt/amnezia/start.sh
-RUN chmod a+x /opt/amnezia/start.sh
+COPY start.sh configure_container.sh /opt/amnezia/
+RUN chmod a+x /opt/amnezia/start.sh /opt/amnezia/configure_container.sh
 
 # Tune network
 RUN echo -e " \n\

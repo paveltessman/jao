@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/paveltessman/jao/installer"
+	"github.com/paveltessman/jao/protocol/awg"
 	"github.com/paveltessman/jao/settings"
 )
 
@@ -16,7 +16,7 @@ func runKey(ctx context.Context, cfg settings.Settings, _ []string) error {
 	}
 	defer closeFn()
 
-	clientConf, err := inst.AddAwgPeer(ctx, installer.DefaultAwgConfig(), cfg.PublicHost)
+	clientConf, err := inst.AddAwgPeer(ctx, awg.DefaultConfig(), cfg.PublicHost)
 	if err != nil {
 		return err
 	}

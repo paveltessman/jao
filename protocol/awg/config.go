@@ -1,4 +1,4 @@
-package installer
+package awg
 
 import (
 	"crypto/ecdh"
@@ -16,22 +16,23 @@ import (
 	"github.com/paveltessman/jao/container"
 )
 
-const awgImageTag = "jao/awg:latest"
+// ImageTag is the tag of the image that BuildContext builds.
+const ImageTag = "jao/awg:latest"
 
-// awgDataDir is the dir in the container with the server keys and awg0.conf.
-const awgDataDir = "/opt/amnezia/awg"
+// dataDir is the dir in the container with the server keys and awg0.conf.
+const dataDir = "/opt/amnezia/awg"
 
-// Files that configure_container.sh makes in awgDataDir.
+// Files that configure_container.sh makes in dataDir.
 const (
-	awgConfPath            = awgDataDir + "/awg0.conf"
-	awgServerPublicKeyPath = awgDataDir + "/wireguard_server_public_key.key"
-	awgPskPath             = awgDataDir + "/wireguard_psk.key"
+	confPath            = dataDir + "/awg0.conf"
+	serverPublicKeyPath = dataDir + "/wireguard_server_public_key.key"
+	pskPath             = dataDir + "/wireguard_psk.key"
 )
 
-// AwgConfig holds the parameters of an AmneziaWG 3.1 server.
+// Config holds the parameters of an AmneziaWG 3.1 server.
 // The defaults and the env names come from the Amnezia client,
 // see client/core/installers/awgInstaller.cpp in amnezia-vpn/amnezia-client.
-type AwgConfig struct {
+type Config struct {
 	Name       string
 	Port       uint16
 	SubnetIP   string
@@ -64,10 +65,10 @@ type AwgConfig struct {
 	SpecialJunk1 string
 }
 
-// DefaultAwgConfig returns the Amnezia defaults with a random junk packet count
+// DefaultConfig returns the Amnezia defaults with a random junk packet count
 // and a new header protection key.
-func DefaultAwgConfig() AwgConfig {
-	return AwgConfig{
+func DefaultConfig() Config {
+	return Config{
 		Name:       "jao-awg",
 		Port:       55424,
 		SubnetIP:   "10.8.1.0",
@@ -100,7 +101,7 @@ func DefaultAwgConfig() AwgConfig {
 	}
 }
 
-func (c AwgConfig) env() map[string]string {
+func (c Config) env() map[string]string {
 	return map[string]string{
 		"AWG_SUBNET_IP":         c.SubnetIP,
 		"WIREGUARD_SUBNET_CIDR": strconv.Itoa(c.SubnetCIDR),
@@ -131,15 +132,17 @@ func (c AwgConfig) env() map[string]string {
 	}
 }
 
-func (c AwgConfig) spec(hostDataDir string) container.ContainerSpec {
+// Spec returns the container spec for c. The server keys stay
+// in hostDataDir on the host.
+func (c Config) Spec(hostDataDir string) container.ContainerSpec {
 	return container.ContainerSpec{
 		Name:    c.Name,
-		Image:   awgImageTag,
+		Image:   ImageTag,
 		Env:     c.env(),
 		CapAdd:  []string{"NET_ADMIN", "SYS_MODULE"},
 		Devices: []string{"/dev/net/tun"},
 		Ports:   []container.PortBinding{{HostPort: c.Port, ContainerPort: c.Port, Protocol: container.UDP}},
-		Mounts:  []container.Mount{{Source: hostDataDir, Target: awgDataDir}},
+		Mounts:  []container.Mount{{Source: hostDataDir, Target: dataDir}},
 		Sysctls: map[string]string{
 			"net.ipv4.ip_forward":              "1",
 			"net.ipv4.conf.all.src_valid_mark": "1",
@@ -159,7 +162,7 @@ func genKey() string {
 func genKeyPair() (private, public string, err error) {
 	key, err := ecdh.X25519().NewPrivateKey(newPrivateKey())
 	if err != nil {
-		return "", "", fmt.Errorf("installer: can't make a key pair: %w", err)
+		return "", "", fmt.Errorf("awg: can't make a key pair: %w", err)
 	}
 	enc := base64.StdEncoding
 	return enc.EncodeToString(key.Bytes()), enc.EncodeToString(key.PublicKey().Bytes()), nil
@@ -173,7 +176,7 @@ func newPrivateKey() []byte {
 	return key
 }
 
-var ErrSubnetFull = errors.New("installer: no free IP in the subnet")
+var ErrSubnetFull = errors.New("awg: no free IP in the subnet")
 
 var allowedIPRe = regexp.MustCompile(`(?m)^\s*AllowedIPs\s*=\s*(\d+\.\d+\.\d+\.\d+)`)
 
@@ -183,11 +186,11 @@ var allowedIPRe = regexp.MustCompile(`(?m)^\s*AllowedIPs\s*=\s*(\d+\.\d+\.\d+\.\
 func nextPeerIP(serverConf string, subnetIP string, subnetCIDR int) (netip.Addr, error) {
 	addr, err := netip.ParseAddr(subnetIP)
 	if err != nil {
-		return netip.Addr{}, fmt.Errorf("installer: bad subnet IP %q: %w", subnetIP, err)
+		return netip.Addr{}, fmt.Errorf("awg: bad subnet IP %q: %w", subnetIP, err)
 	}
 	subnet, err := addr.Prefix(subnetCIDR)
 	if err != nil {
-		return netip.Addr{}, fmt.Errorf("installer: bad subnet %s/%d: %w", subnetIP, subnetCIDR, err)
+		return netip.Addr{}, fmt.Errorf("awg: bad subnet %s/%d: %w", subnetIP, subnetCIDR, err)
 	}
 
 	used := map[netip.Addr]bool{}
@@ -207,13 +210,13 @@ func nextPeerIP(serverConf string, subnetIP string, subnetCIDR int) (netip.Addr,
 
 // Client config defaults from the Amnezia client.
 const (
-	awgClientDNS        = "1.1.1.1, 1.0.0.1"
-	awgClientAllowedIPs = "0.0.0.0/0, ::/0"
-	awgClientKeepalive  = "25-35"
+	clientDNS        = "1.1.1.1, 1.0.0.1"
+	clientAllowedIPs = "0.0.0.0/0, ::/0"
+	clientKeepalive  = "25-35"
 )
 
-// awgClient holds the per-peer values of a client config.
-type awgClient struct {
+// client holds the per-peer values of a client config.
+type client struct {
 	PrivateKey      string
 	IP              netip.Addr
 	ServerPublicKey string
@@ -223,10 +226,10 @@ type awgClient struct {
 // clientConfig makes the config that the user imports into the AmneziaVPN app.
 // It has the layout of server_scripts/awg/template.conf in the Amnezia client.
 // A line with an empty value is dropped, because each AWG parameter is optional.
-func (c AwgConfig) clientConfig(cl awgClient, endpointHost string) string {
+func (c Config) clientConfig(cl client, endpointHost string) string {
 	iface := [][2]string{
 		{"Address", cl.IP.String() + "/32"},
-		{"DNS", awgClientDNS},
+		{"DNS", clientDNS},
 		{"PrivateKey", cl.PrivateKey},
 		{"Jc", strconv.Itoa(c.JunkPacketCount)},
 		{"Jmin", strconv.Itoa(c.JunkPacketMinSize)},
@@ -252,9 +255,9 @@ func (c AwgConfig) clientConfig(cl awgClient, endpointHost string) string {
 	peer := [][2]string{
 		{"PublicKey", cl.ServerPublicKey},
 		{"PresharedKey", cl.PresharedKey},
-		{"AllowedIPs", awgClientAllowedIPs},
+		{"AllowedIPs", clientAllowedIPs},
 		{"Endpoint", net.JoinHostPort(endpointHost, strconv.Itoa(int(c.Port)))},
-		{"PersistentKeepalive", awgClientKeepalive},
+		{"PersistentKeepalive", clientKeepalive},
 	}
 
 	var b strings.Builder

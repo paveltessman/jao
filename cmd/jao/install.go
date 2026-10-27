@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	"github.com/paveltessman/jao/installer"
+	"github.com/paveltessman/jao/protocol/awg"
 	"github.com/paveltessman/jao/settings"
 )
 
@@ -14,5 +14,5 @@ func runInstall(ctx context.Context, cfg settings.Settings, _ []string) error {
 	}
 	defer closeFn()
 
-	return inst.InstallAwg(ctx, installer.DefaultAwgConfig())
+	return inst.InstallAwg(ctx, awg.DefaultConfig())
 }

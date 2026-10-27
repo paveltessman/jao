@@ -15,6 +15,7 @@ import (
 
 	"github.com/paveltessman/jao/container"
 	"github.com/paveltessman/jao/installer"
+	"github.com/paveltessman/jao/protocol/awg"
 )
 
 func freeUDPPort(t *testing.T) uint16 {
@@ -60,7 +61,7 @@ func TestInstallAwgBringsUpInterface(t *testing.T) {
 	})
 
 	workDir := t.TempDir()
-	cfg := installer.DefaultAwgConfig()
+	cfg := awg.DefaultConfig()
 	cfg.Name = "jao-awg-test"
 	cfg.Port = freeUDPPort(t)
 
@@ -119,7 +120,7 @@ func newContainerService(t *testing.T) *container.Service {
 }
 
 // installAwg installs cfg and removes the container when the test ends.
-func installAwg(t *testing.T, ctr *container.Service, inst *installer.Service, cfg installer.AwgConfig) {
+func installAwg(t *testing.T, ctr *container.Service, inst *installer.Service, cfg awg.Config) {
 	t.Helper()
 
 	t.Cleanup(func() {
@@ -142,7 +143,7 @@ func TestAddAwgPeerConnectsClient(t *testing.T) {
 	ctr := newContainerService(t)
 	inst := installer.New(ctr, t.TempDir())
 
-	server := installer.DefaultAwgConfig()
+	server := awg.DefaultConfig()
 	server.Name = "jao-awg-test-server"
 	server.Port = freeUDPPort(t)
 	installAwg(t, ctr, inst, server)
@@ -172,7 +173,7 @@ func TestAddAwgPeerConnectsClient(t *testing.T) {
 	// The client runs in a second AWG container with its own awg0 on another subnet.
 	// The test drops DNS, because awg-quick needs resolvconf for it,
 	// and routes only the server subnet, to keep the container network.
-	client := installer.DefaultAwgConfig()
+	client := awg.DefaultConfig()
 	client.Name = "jao-awg-test-client"
 	client.Port = freeUDPPort(t)
 	client.SubnetIP = "10.9.9.0"

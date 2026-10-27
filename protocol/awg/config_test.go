@@ -1,4 +1,4 @@
-package installer
+package awg
 
 import (
 	"crypto/ecdh"
@@ -10,9 +10,9 @@ import (
 	"testing"
 )
 
-func TestDefaultAwgConfigUsesAmneziaValues(t *testing.T) {
+func TestDefaultConfigUsesAmneziaValues(t *testing.T) {
 
-	cfg := DefaultAwgConfig()
+	cfg := DefaultConfig()
 
 	want := map[string]string{
 		"JUNK_PACKET_MIN_SIZE":          "10",
@@ -47,20 +47,20 @@ func TestDefaultAwgConfigUsesAmneziaValues(t *testing.T) {
 	}
 }
 
-func TestDefaultAwgConfigJunkPacketCountInRange(t *testing.T) {
+func TestDefaultConfigJunkPacketCountInRange(t *testing.T) {
 
 	for range 200 {
-		jc := DefaultAwgConfig().JunkPacketCount
+		jc := DefaultConfig().JunkPacketCount
 		if jc < 4 || jc > 6 {
 			t.Fatalf("junk packet count: want 4..6, got %d", jc)
 		}
 	}
 }
 
-func TestDefaultAwgConfigMakesNewHeaderProtectionKey(t *testing.T) {
+func TestDefaultConfigMakesNewHeaderProtectionKey(t *testing.T) {
 
-	first := DefaultAwgConfig().HeaderProtectionKey
-	second := DefaultAwgConfig().HeaderProtectionKey
+	first := DefaultConfig().HeaderProtectionKey
+	second := DefaultConfig().HeaderProtectionKey
 
 	if first == second {
 		t.Errorf("want a new key for each config, got %s twice", first)
@@ -183,9 +183,9 @@ func TestNextPeerIPRejectsBadSubnet(t *testing.T) {
 
 func TestClientConfigHoldsServerParams(t *testing.T) {
 
-	cfg := DefaultAwgConfig()
+	cfg := DefaultConfig()
 	cfg.Port = 40001
-	cl := awgClient{
+	cl := client{
 		PrivateKey:      "Y2xpZW50",
 		IP:              netip.MustParseAddr("10.8.1.2"),
 		ServerPublicKey: "c2VydmVy",
@@ -223,10 +223,10 @@ func TestClientConfigHoldsServerParams(t *testing.T) {
 
 func TestClientConfigDropsEmptyValues(t *testing.T) {
 
-	cfg := DefaultAwgConfig()
+	cfg := DefaultConfig()
 	cfg.SpecialJunk1 = ""
 	cfg.RandomTrailers = ""
-	cl := awgClient{IP: netip.MustParseAddr("10.8.1.2")}
+	cl := client{IP: netip.MustParseAddr("10.8.1.2")}
 
 	conf := cfg.clientConfig(cl, "2001:db8::1")
 

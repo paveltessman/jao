@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/paveltessman/jao/container"
 	"github.com/paveltessman/jao/installer"
+	"github.com/paveltessman/jao/protocol"
 	"github.com/paveltessman/jao/protocol/awg"
 )
 
@@ -101,6 +103,26 @@ func TestInstallAwgBringsUpInterface(t *testing.T) {
 	ifaceKey := waitExec(t, ctr, cfg.Name, "awg", "show", "awg0", "public-key")
 	if strings.TrimSpace(string(pubKey)) != strings.TrimSpace(ifaceKey) {
 		t.Errorf("public key: want host file %q to match awg0 %q", pubKey, ifaceKey)
+	}
+
+	// The key service finds the container by its label and reads cfg back.
+	list, err := ctr.ContainerList(t.Context(), protocol.Label)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	i := slices.IndexFunc(list, func(c container.Container) bool { return c.Name == cfg.Name })
+	if i < 0 {
+		t.Fatalf("want %s in the labeled containers, got %v", cfg.Name, list)
+	}
+	if got := list[i].Labels[protocol.Label]; got != protocol.AWG {
+		t.Errorf("label %s: want %s, got %q", protocol.Label, protocol.AWG, got)
+	}
+	read, err := awg.ConfigFromEnv(list[i].Name, list[i].Env)
+	if err != nil {
+		t.Fatalf("config from env: %v", err)
+	}
+	if read != cfg {
+		t.Errorf("config from env: want\n%+v\ngot\n%+v", cfg, read)
 	}
 }
 

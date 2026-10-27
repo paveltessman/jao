@@ -242,3 +242,70 @@ func TestClientConfigDropsEmptyValues(t *testing.T) {
 		t.Errorf("want a bracketed IPv6 endpoint, got:\n%s", conf)
 	}
 }
+
+func TestConfigFromEnvReadsWhatEnvWrites(t *testing.T) {
+
+	cfg := DefaultConfig()
+	cfg.Name = "awg-test"
+	cfg.Port = 40001
+	cfg.RandomTrailers = ""
+
+	env := cfg.env()
+	env["PATH"] = "/usr/bin" // the image adds its own env
+
+	got, err := ConfigFromEnv("awg-test", env)
+	if err != nil {
+		t.Fatalf("config from env: %v", err)
+	}
+	if got != cfg {
+		t.Errorf("want\n%+v\ngot\n%+v", cfg, got)
+	}
+}
+
+func TestConfigFromEnvKeepsMissingTextEmpty(t *testing.T) {
+
+	env := DefaultConfig().env()
+	delete(env, "HEADER_PROTECTION_KEY")
+	delete(env, "SPECIAL_JUNK_1")
+
+	got, err := ConfigFromEnv("awg-test", env)
+	if err != nil {
+		t.Fatalf("config from env: %v", err)
+	}
+	if got.HeaderProtectionKey != "" || got.SpecialJunk1 != "" {
+		t.Errorf("want empty values, got %q and %q", got.HeaderProtectionKey, got.SpecialJunk1)
+	}
+}
+
+func TestConfigFromEnvRejectsBadEnv(t *testing.T) {
+
+	tests := []struct {
+		name  string
+		key   string
+		value string // empty value means: remove the key
+	}{
+		{"missing port", "AWG_SERVER_PORT", ""},
+		{"port too large", "AWG_SERVER_PORT", "70000"},
+		{"bad CIDR", "WIREGUARD_SUBNET_CIDR", "abc"},
+		{"missing junk count", "JUNK_PACKET_COUNT", ""},
+		{"missing subnet IP", "AWG_SUBNET_IP", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			env := DefaultConfig().env()
+			if tt.value == "" {
+				delete(env, tt.key)
+			} else {
+				env[tt.key] = tt.value
+			}
+
+			_, err := ConfigFromEnv("awg-test", env)
+			if !errors.Is(err, ErrBadEnv) {
+				t.Fatalf("want ErrBadEnv, got %v", err)
+			}
+			if !strings.Contains(err.Error(), tt.key) || !strings.Contains(err.Error(), "awg-test") {
+				t.Errorf("want the key and the container name in the error, got %v", err)
+			}
+		})
+	}
+}

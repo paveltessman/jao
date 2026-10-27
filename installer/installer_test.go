@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/paveltessman/jao/container"
+	"github.com/paveltessman/jao/protocol"
 	"github.com/paveltessman/jao/protocol/awg"
 )
 
@@ -63,6 +64,9 @@ func TestInstallAwgCreatesContainerFromConfig(t *testing.T) {
 	if spec.Name != "awg-test" {
 		t.Errorf("name: want awg-test, got %s", spec.Name)
 	}
+	if got := spec.Labels[protocol.Label]; got != protocol.AWG {
+		t.Errorf("label %s: want %s, got %q", protocol.Label, protocol.AWG, got)
+	}
 	if ctr.startedID != "ctr-1" {
 		t.Errorf("start: want ctr-1, got %q", ctr.startedID)
 	}
@@ -74,6 +78,7 @@ func TestInstallAwgCreatesContainerFromConfig(t *testing.T) {
 		"HEADER_PROTECTION_KEY": cfg.HeaderProtectionKey,
 		"REKEY_AFTER_TIME":      "100-120",
 		"DISABLE_COOKIES":       "on",
+		"SPECIAL_JUNK_1":        cfg.SpecialJunk1,
 	}
 	for key, want := range wantEnv {
 		if got := spec.Env[key]; got != want {

@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/paveltessman/jao/container"
+	"github.com/paveltessman/jao/protocol"
 )
 
 // ImageTag is the tag of the image that BuildContext builds.
@@ -129,7 +130,83 @@ func (c Config) env() map[string]string {
 		"MAX_HANDSHAKE_ATTEMPTS": c.MaxHandshakeAttempts,
 		"RANDOM_TRAILERS":        c.RandomTrailers,
 		"DISABLE_COOKIES":        c.DisableCookies,
+
+		"SPECIAL_JUNK_1": c.SpecialJunk1,
 	}
+}
+
+var ErrBadEnv = errors.New("awg: bad container env")
+
+// ConfigFromEnv reads the config of the container with the given name
+// from its env. It is the reverse of env. The env can also hold other keys.
+// A missing text value is empty, because each AWG parameter is optional.
+// A missing number is an error.
+func ConfigFromEnv(name string, env map[string]string) (Config, error) {
+	r := envReader{env: env}
+	cfg := Config{
+		Name:       name,
+		Port:       r.port("AWG_SERVER_PORT"),
+		SubnetIP:   r.str("AWG_SUBNET_IP"),
+		SubnetCIDR: r.int("WIREGUARD_SUBNET_CIDR"),
+
+		JunkPacketCount:   r.int("JUNK_PACKET_COUNT"),
+		JunkPacketMinSize: r.int("JUNK_PACKET_MIN_SIZE"),
+		JunkPacketMaxSize: r.int("JUNK_PACKET_MAX_SIZE"),
+
+		InitPacketJunkSize:        r.int("INIT_PACKET_JUNK_SIZE"),
+		ResponsePacketJunkSize:    r.int("RESPONSE_PACKET_JUNK_SIZE"),
+		CookieReplyPacketJunkSize: r.int("COOKIE_REPLY_PACKET_JUNK_SIZE"),
+		TransportPacketJunkSize:   r.int("TRANSPORT_PACKET_JUNK_SIZE"),
+
+		InitPacketMagicHeader:      r.str("INIT_PACKET_MAGIC_HEADER"),
+		ResponsePacketMagicHeader:  r.str("RESPONSE_PACKET_MAGIC_HEADER"),
+		UnderloadPacketMagicHeader: r.str("UNDERLOAD_PACKET_MAGIC_HEADER"),
+		TransportPacketMagicHeader: r.str("TRANSPORT_PACKET_MAGIC_HEADER"),
+
+		HeaderProtectionKey:  r.str("HEADER_PROTECTION_KEY"),
+		RekeyAfterTime:       r.str("REKEY_AFTER_TIME"),
+		RekeyTimeout:         r.str("REKEY_TIMEOUT"),
+		RejectAfterTime:      r.str("REJECT_AFTER_TIME"),
+		KeepaliveTimeout:     r.str("KEEPALIVE_TIMEOUT"),
+		MaxHandshakeAttempts: r.str("MAX_HANDSHAKE_ATTEMPTS"),
+		RandomTrailers:       r.str("RANDOM_TRAILERS"),
+		DisableCookies:       r.str("DISABLE_COOKIES"),
+
+		SpecialJunk1: r.str("SPECIAL_JUNK_1"),
+	}
+	if r.err != nil {
+		return Config{}, fmt.Errorf("%w in %s: %w", ErrBadEnv, name, r.err)
+	}
+	if cfg.SubnetIP == "" {
+		return Config{}, fmt.Errorf("%w in %s: AWG_SUBNET_IP is empty", ErrBadEnv, name)
+	}
+	return cfg, nil
+}
+
+// envReader reads values from an env and keeps the first error.
+type envReader struct {
+	env map[string]string
+	err error
+}
+
+func (r *envReader) str(key string) string {
+	return r.env[key]
+}
+
+func (r *envReader) int(key string) int {
+	n, err := strconv.Atoi(r.env[key])
+	if err != nil && r.err == nil {
+		r.err = fmt.Errorf("%s: %w", key, err)
+	}
+	return n
+}
+
+func (r *envReader) port(key string) uint16 {
+	n, err := strconv.ParseUint(r.env[key], 10, 16)
+	if err != nil && r.err == nil {
+		r.err = fmt.Errorf("%s: %w", key, err)
+	}
+	return uint16(n)
 }
 
 // Spec returns the container spec for c. The server keys stay
@@ -138,6 +215,7 @@ func (c Config) Spec(hostDataDir string) container.ContainerSpec {
 	return container.ContainerSpec{
 		Name:    c.Name,
 		Image:   ImageTag,
+		Labels:  map[string]string{protocol.Label: protocol.AWG},
 		Env:     c.env(),
 		CapAdd:  []string{"NET_ADMIN", "SYS_MODULE"},
 		Devices: []string{"/dev/net/tun"},

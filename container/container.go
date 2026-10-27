@@ -12,6 +12,7 @@ import (
 	"maps"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/api/types/container"
@@ -26,6 +27,7 @@ var ErrContainerCreate = errors.New("can't create container")
 var ErrContainerStart = errors.New("can't start container")
 var ErrContainerExec = errors.New("can't exec in container")
 var ErrContainerRemove = errors.New("can't remove container")
+var ErrContainerList = errors.New("can't list containers")
 
 type Service struct {
 	client *client.Client
@@ -159,9 +161,48 @@ func (s *Service) ContainerRemove(ctx context.Context, id string) error {
 	return nil
 }
 
+// ContainerList returns all containers that have the label key,
+// with any value. The list also holds the containers that do not run.
+func (s *Service) ContainerList(ctx context.Context, label string) ([]Container, error) {
+	list, err := s.client.ContainerList(ctx, client.ContainerListOptions{
+		All:     true,
+		Filters: client.Filters{}.Add("label", label),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrContainerList, err)
+	}
+
+	// The list does not hold the env, so each container needs an inspect.
+	var containers []Container
+	for _, item := range list.Items {
+		inspect, err := s.client.ContainerInspect(ctx, item.ID, client.ContainerInspectOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrContainerList, err)
+		}
+		c := inspect.Container
+
+		env := map[string]string{}
+		if c.Config != nil {
+			for _, kv := range c.Config.Env {
+				key, value, _ := strings.Cut(kv, "=")
+				env[key] = value
+			}
+		}
+
+		containers = append(containers, Container{
+			ID:     c.ID,
+			Name:   strings.TrimPrefix(c.Name, "/"),
+			Labels: item.Labels,
+			Env:    env,
+		})
+	}
+	return containers, nil
+}
+
 func toDocker(spec ContainerSpec) (*container.Config, *container.HostConfig, error) {
 	cfg := container.Config{
 		Image:        spec.Image,
+		Labels:       spec.Labels,
 		ExposedPorts: network.PortSet{},
 	}
 	for _, key := range slices.Sorted(maps.Keys(spec.Env)) {

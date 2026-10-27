@@ -4,6 +4,7 @@ package container
 type ContainerSpec struct {
 	Name    string
 	Image   string
+	Labels  map[string]string
 	Env     map[string]string
 	CapAdd  []string
 	Devices []string // host paths, mapped to the same path in the container
@@ -11,6 +12,14 @@ type ContainerSpec struct {
 	Mounts  []Mount
 	Sysctls map[string]string
 	Restart RestartPolicy
+}
+
+// Container describes a container that exists on the host.
+type Container struct {
+	ID     string
+	Name   string
+	Labels map[string]string
+	Env    map[string]string
 }
 
 type Protocol string

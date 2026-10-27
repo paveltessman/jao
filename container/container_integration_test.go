@@ -78,8 +78,21 @@ func startTestContainer(t *testing.T, svc *Service, spec ContainerSpec) string {
 		}
 	})
 
+	id := createTestContainer(t, svc, spec)
+	if err := svc.ContainerStart(ctx, id); err != nil {
+		t.Fatalf("start container: %v", err)
+	}
+
+	return id
+}
+
+// createTestContainer creates a container from testImage and does not start it.
+// The image must exist.
+func createTestContainer(t *testing.T, svc *Service, spec ContainerSpec) string {
+	t.Helper()
+
 	spec.Image = testImage
-	id, err := svc.ContainerCreate(ctx, spec)
+	id, err := svc.ContainerCreate(t.Context(), spec)
 	if err != nil {
 		t.Fatalf("create container: %v", err)
 	}
@@ -88,10 +101,6 @@ func startTestContainer(t *testing.T, svc *Service, spec ContainerSpec) string {
 			t.Errorf("remove container: %v", err)
 		}
 	})
-
-	if err := svc.ContainerStart(ctx, id); err != nil {
-		t.Fatalf("start container: %v", err)
-	}
 
 	return id
 }
@@ -194,5 +203,55 @@ func TestContainerExecFailsOnNonZeroExit(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "exit code 3") || !strings.Contains(err.Error(), "oops") {
 		t.Errorf("want exit code and stderr in error, got %v", err)
+	}
+}
+
+func TestContainerListFindsLabeledContainers(t *testing.T) {
+
+	svc := newService(t)
+
+	// A label only for this test, so the list does not see other containers.
+	const label = "jao.test.list"
+
+	running := startTestContainer(t, svc, ContainerSpec{
+		Name:   "jao-container-test-running",
+		Labels: map[string]string{label: "a"},
+		Env:    map[string]string{"FOO": "bar=baz"},
+	})
+	created := createTestContainer(t, svc, ContainerSpec{
+		Name:   "jao-container-test-created",
+		Labels: map[string]string{label: "b"},
+	})
+	createTestContainer(t, svc, ContainerSpec{Name: "jao-container-test-unlabeled"})
+
+	list, err := svc.ContainerList(t.Context(), label)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+
+	got := map[string]Container{}
+	for _, c := range list {
+		got[c.ID] = c
+	}
+	if len(got) != 2 {
+		t.Fatalf("want 2 labeled containers, got %v", list)
+	}
+
+	r, ok := got[running]
+	if !ok {
+		t.Fatalf("want the running container in %v", list)
+	}
+	if r.Name != "jao-container-test-running" {
+		t.Errorf("name: want jao-container-test-running, got %q", r.Name)
+	}
+	if r.Labels[label] != "a" {
+		t.Errorf("label: want a, got %q", r.Labels[label])
+	}
+	if r.Env["FOO"] != "bar=baz" {
+		t.Errorf("env FOO: want bar=baz, got %q", r.Env["FOO"])
+	}
+
+	if c, ok := got[created]; !ok || c.Labels[label] != "b" {
+		t.Errorf("want the stopped container with label b in %v", list)
 	}
 }

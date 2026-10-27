@@ -22,6 +22,7 @@ func commands() []command {
 	commands := []command{
 		{"install", "install the AWG container", runInstall},
 		{"key", "create a key in a protocol container and print its client config", runKey},
+		{"list", "list the protocol containers on the node", runList},
 	}
 	return commands
 }

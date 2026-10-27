@@ -1,4 +1,4 @@
-package installer
+package awg
 
 import (
 	"crypto/ecdh"
@@ -12,24 +12,28 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/paveltessman/jao/container"
+	"github.com/paveltessman/jao/protocol"
 )
 
-const awgImageTag = "jao/awg:latest"
+// ImageTag is the tag of the image that BuildContext builds.
+const ImageTag = "jao/awg:latest"
 
-// awgDataDir is the dir in the container with the server keys and awg0.conf.
-const awgDataDir = "/opt/amnezia/awg"
+// dataDir is the dir in the container with the server keys and awg0.conf.
+const dataDir = "/opt/amnezia/awg"
 
-// Files that configure_container.sh makes in awgDataDir.
+// Files that configure_container.sh makes in dataDir.
 const (
-	awgConfPath            = awgDataDir + "/awg0.conf"
-	awgServerPublicKeyPath = awgDataDir + "/wireguard_server_public_key.key"
-	awgPskPath             = awgDataDir + "/wireguard_psk.key"
+	confPath            = dataDir + "/awg0.conf"
+	serverPublicKeyPath = dataDir + "/wireguard_server_public_key.key"
+	pskPath             = dataDir + "/wireguard_psk.key"
 )
 
-// AwgConfig holds the parameters of an AmneziaWG 3.1 server.
+// Config holds the parameters of an AmneziaWG 3.1 server.
 // The defaults and the env names come from the Amnezia client,
 // see client/core/installers/awgInstaller.cpp in amnezia-vpn/amnezia-client.
-type AwgConfig struct {
+type Config struct {
 	Name       string
 	Port       uint16
 	SubnetIP   string
@@ -62,10 +66,10 @@ type AwgConfig struct {
 	SpecialJunk1 string
 }
 
-// DefaultAwgConfig returns the Amnezia defaults with a random junk packet count
+// DefaultConfig returns the Amnezia defaults with a random junk packet count
 // and a new header protection key.
-func DefaultAwgConfig() AwgConfig {
-	return AwgConfig{
+func DefaultConfig() Config {
+	return Config{
 		Name:       "jao-awg",
 		Port:       55424,
 		SubnetIP:   "10.8.1.0",
@@ -98,7 +102,7 @@ func DefaultAwgConfig() AwgConfig {
 	}
 }
 
-func (c AwgConfig) env() map[string]string {
+func (c Config) env() map[string]string {
 	return map[string]string{
 		"AWG_SUBNET_IP":         c.SubnetIP,
 		"WIREGUARD_SUBNET_CIDR": strconv.Itoa(c.SubnetCIDR),
@@ -126,23 +130,102 @@ func (c AwgConfig) env() map[string]string {
 		"MAX_HANDSHAKE_ATTEMPTS": c.MaxHandshakeAttempts,
 		"RANDOM_TRAILERS":        c.RandomTrailers,
 		"DISABLE_COOKIES":        c.DisableCookies,
+
+		"SPECIAL_JUNK_1": c.SpecialJunk1,
 	}
 }
 
-func (c AwgConfig) spec(hostDataDir string) ContainerSpec {
-	return ContainerSpec{
+var ErrBadEnv = errors.New("awg: bad container env")
+
+// ConfigFromEnv reads the config of the container with the given name
+// from its env. It is the reverse of env. The env can also hold other keys.
+// A missing text value is empty, because each AWG parameter is optional.
+// A missing number is an error.
+func ConfigFromEnv(name string, env map[string]string) (Config, error) {
+	r := envReader{env: env}
+	cfg := Config{
+		Name:       name,
+		Port:       r.port("AWG_SERVER_PORT"),
+		SubnetIP:   r.str("AWG_SUBNET_IP"),
+		SubnetCIDR: r.int("WIREGUARD_SUBNET_CIDR"),
+
+		JunkPacketCount:   r.int("JUNK_PACKET_COUNT"),
+		JunkPacketMinSize: r.int("JUNK_PACKET_MIN_SIZE"),
+		JunkPacketMaxSize: r.int("JUNK_PACKET_MAX_SIZE"),
+
+		InitPacketJunkSize:        r.int("INIT_PACKET_JUNK_SIZE"),
+		ResponsePacketJunkSize:    r.int("RESPONSE_PACKET_JUNK_SIZE"),
+		CookieReplyPacketJunkSize: r.int("COOKIE_REPLY_PACKET_JUNK_SIZE"),
+		TransportPacketJunkSize:   r.int("TRANSPORT_PACKET_JUNK_SIZE"),
+
+		InitPacketMagicHeader:      r.str("INIT_PACKET_MAGIC_HEADER"),
+		ResponsePacketMagicHeader:  r.str("RESPONSE_PACKET_MAGIC_HEADER"),
+		UnderloadPacketMagicHeader: r.str("UNDERLOAD_PACKET_MAGIC_HEADER"),
+		TransportPacketMagicHeader: r.str("TRANSPORT_PACKET_MAGIC_HEADER"),
+
+		HeaderProtectionKey:  r.str("HEADER_PROTECTION_KEY"),
+		RekeyAfterTime:       r.str("REKEY_AFTER_TIME"),
+		RekeyTimeout:         r.str("REKEY_TIMEOUT"),
+		RejectAfterTime:      r.str("REJECT_AFTER_TIME"),
+		KeepaliveTimeout:     r.str("KEEPALIVE_TIMEOUT"),
+		MaxHandshakeAttempts: r.str("MAX_HANDSHAKE_ATTEMPTS"),
+		RandomTrailers:       r.str("RANDOM_TRAILERS"),
+		DisableCookies:       r.str("DISABLE_COOKIES"),
+
+		SpecialJunk1: r.str("SPECIAL_JUNK_1"),
+	}
+	if r.err != nil {
+		return Config{}, fmt.Errorf("%w in %s: %w", ErrBadEnv, name, r.err)
+	}
+	if cfg.SubnetIP == "" {
+		return Config{}, fmt.Errorf("%w in %s: AWG_SUBNET_IP is empty", ErrBadEnv, name)
+	}
+	return cfg, nil
+}
+
+// envReader reads values from an env and keeps the first error.
+type envReader struct {
+	env map[string]string
+	err error
+}
+
+func (r *envReader) str(key string) string {
+	return r.env[key]
+}
+
+func (r *envReader) int(key string) int {
+	n, err := strconv.Atoi(r.env[key])
+	if err != nil && r.err == nil {
+		r.err = fmt.Errorf("%s: %w", key, err)
+	}
+	return n
+}
+
+func (r *envReader) port(key string) uint16 {
+	n, err := strconv.ParseUint(r.env[key], 10, 16)
+	if err != nil && r.err == nil {
+		r.err = fmt.Errorf("%s: %w", key, err)
+	}
+	return uint16(n)
+}
+
+// Spec returns the container spec for c. The server keys stay
+// in hostDataDir on the host.
+func (c Config) Spec(hostDataDir string) container.ContainerSpec {
+	return container.ContainerSpec{
 		Name:    c.Name,
-		Image:   awgImageTag,
+		Image:   ImageTag,
+		Labels:  map[string]string{protocol.Label: protocol.AWG},
 		Env:     c.env(),
 		CapAdd:  []string{"NET_ADMIN", "SYS_MODULE"},
 		Devices: []string{"/dev/net/tun"},
-		Ports:   []PortBinding{{HostPort: c.Port, ContainerPort: c.Port, Protocol: UDP}},
-		Mounts:  []Mount{{Source: hostDataDir, Target: awgDataDir}},
+		Ports:   []container.PortBinding{{HostPort: c.Port, ContainerPort: c.Port, Protocol: container.UDP}},
+		Mounts:  []container.Mount{{Source: hostDataDir, Target: dataDir}},
 		Sysctls: map[string]string{
 			"net.ipv4.ip_forward":              "1",
 			"net.ipv4.conf.all.src_valid_mark": "1",
 		},
-		Restart: RestartUnlessStopped,
+		Restart: container.RestartUnlessStopped,
 	}
 }
 
@@ -157,7 +240,7 @@ func genKey() string {
 func genKeyPair() (private, public string, err error) {
 	key, err := ecdh.X25519().NewPrivateKey(newPrivateKey())
 	if err != nil {
-		return "", "", fmt.Errorf("installer: can't make a key pair: %w", err)
+		return "", "", fmt.Errorf("awg: can't make a key pair: %w", err)
 	}
 	enc := base64.StdEncoding
 	return enc.EncodeToString(key.Bytes()), enc.EncodeToString(key.PublicKey().Bytes()), nil
@@ -171,7 +254,7 @@ func newPrivateKey() []byte {
 	return key
 }
 
-var ErrSubnetFull = errors.New("installer: no free IP in the subnet")
+var ErrSubnetFull = errors.New("awg: no free IP in the subnet")
 
 var allowedIPRe = regexp.MustCompile(`(?m)^\s*AllowedIPs\s*=\s*(\d+\.\d+\.\d+\.\d+)`)
 
@@ -181,11 +264,11 @@ var allowedIPRe = regexp.MustCompile(`(?m)^\s*AllowedIPs\s*=\s*(\d+\.\d+\.\d+\.\
 func nextPeerIP(serverConf string, subnetIP string, subnetCIDR int) (netip.Addr, error) {
 	addr, err := netip.ParseAddr(subnetIP)
 	if err != nil {
-		return netip.Addr{}, fmt.Errorf("installer: bad subnet IP %q: %w", subnetIP, err)
+		return netip.Addr{}, fmt.Errorf("awg: bad subnet IP %q: %w", subnetIP, err)
 	}
 	subnet, err := addr.Prefix(subnetCIDR)
 	if err != nil {
-		return netip.Addr{}, fmt.Errorf("installer: bad subnet %s/%d: %w", subnetIP, subnetCIDR, err)
+		return netip.Addr{}, fmt.Errorf("awg: bad subnet %s/%d: %w", subnetIP, subnetCIDR, err)
 	}
 
 	used := map[netip.Addr]bool{}
@@ -205,13 +288,13 @@ func nextPeerIP(serverConf string, subnetIP string, subnetCIDR int) (netip.Addr,
 
 // Client config defaults from the Amnezia client.
 const (
-	awgClientDNS        = "1.1.1.1, 1.0.0.1"
-	awgClientAllowedIPs = "0.0.0.0/0, ::/0"
-	awgClientKeepalive  = "25-35"
+	clientDNS        = "1.1.1.1, 1.0.0.1"
+	clientAllowedIPs = "0.0.0.0/0, ::/0"
+	clientKeepalive  = "25-35"
 )
 
-// awgClient holds the per-peer values of a client config.
-type awgClient struct {
+// client holds the per-peer values of a client config.
+type client struct {
 	PrivateKey      string
 	IP              netip.Addr
 	ServerPublicKey string
@@ -221,10 +304,10 @@ type awgClient struct {
 // clientConfig makes the config that the user imports into the AmneziaVPN app.
 // It has the layout of server_scripts/awg/template.conf in the Amnezia client.
 // A line with an empty value is dropped, because each AWG parameter is optional.
-func (c AwgConfig) clientConfig(cl awgClient, endpointHost string) string {
+func (c Config) clientConfig(cl client, endpointHost string) string {
 	iface := [][2]string{
 		{"Address", cl.IP.String() + "/32"},
-		{"DNS", awgClientDNS},
+		{"DNS", clientDNS},
 		{"PrivateKey", cl.PrivateKey},
 		{"Jc", strconv.Itoa(c.JunkPacketCount)},
 		{"Jmin", strconv.Itoa(c.JunkPacketMinSize)},
@@ -250,9 +333,9 @@ func (c AwgConfig) clientConfig(cl awgClient, endpointHost string) string {
 	peer := [][2]string{
 		{"PublicKey", cl.ServerPublicKey},
 		{"PresharedKey", cl.PresharedKey},
-		{"AllowedIPs", awgClientAllowedIPs},
+		{"AllowedIPs", clientAllowedIPs},
 		{"Endpoint", net.JoinHostPort(endpointHost, strconv.Itoa(int(c.Port)))},
-		{"PersistentKeepalive", awgClientKeepalive},
+		{"PersistentKeepalive", clientKeepalive},
 	}
 
 	var b strings.Builder

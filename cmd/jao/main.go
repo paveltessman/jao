@@ -9,7 +9,6 @@ import (
 	"syscall"
 
 	"github.com/paveltessman/jao/container"
-	"github.com/paveltessman/jao/installer"
 	"github.com/paveltessman/jao/settings"
 )
 
@@ -22,7 +21,8 @@ type command struct {
 func commands() []command {
 	commands := []command{
 		{"install", "install the AWG container", runInstall},
-		{"key", "add a peer to the AWG container and print its client config", runKey},
+		{"key", "create a key in a protocol container and print its client config", runKey},
+		{"list", "list the protocol containers on the node", runList},
 	}
 	return commands
 }
@@ -62,9 +62,9 @@ func usage() {
 	}
 }
 
-// newInstaller connects to the Docker engine and makes sure that it replies.
+// newContainerService connects to the Docker engine and makes sure that it replies.
 // The caller must call the returned close function when it is done.
-func newInstaller(ctx context.Context, cfg settings.Settings) (*installer.Service, func(), error) {
+func newContainerService(ctx context.Context) (*container.Service, func(), error) {
 	ctrSvc, err := container.New()
 	if err != nil {
 		return nil, nil, err
@@ -80,5 +80,5 @@ func newInstaller(ctx context.Context, cfg settings.Settings) (*installer.Servic
 		return nil, nil, err
 	}
 
-	return installer.New(ctrSvc, cfg.WorkDir), closeFn, nil
+	return ctrSvc, closeFn, nil
 }

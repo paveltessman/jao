@@ -1,4 +1,4 @@
-package installer
+package awg
 
 import (
 	"crypto/ecdh"
@@ -10,9 +10,9 @@ import (
 	"testing"
 )
 
-func TestDefaultAwgConfigUsesAmneziaValues(t *testing.T) {
+func TestDefaultConfigUsesAmneziaValues(t *testing.T) {
 
-	cfg := DefaultAwgConfig()
+	cfg := DefaultConfig()
 
 	want := map[string]string{
 		"JUNK_PACKET_MIN_SIZE":          "10",
@@ -47,20 +47,20 @@ func TestDefaultAwgConfigUsesAmneziaValues(t *testing.T) {
 	}
 }
 
-func TestDefaultAwgConfigJunkPacketCountInRange(t *testing.T) {
+func TestDefaultConfigJunkPacketCountInRange(t *testing.T) {
 
 	for range 200 {
-		jc := DefaultAwgConfig().JunkPacketCount
+		jc := DefaultConfig().JunkPacketCount
 		if jc < 4 || jc > 6 {
 			t.Fatalf("junk packet count: want 4..6, got %d", jc)
 		}
 	}
 }
 
-func TestDefaultAwgConfigMakesNewHeaderProtectionKey(t *testing.T) {
+func TestDefaultConfigMakesNewHeaderProtectionKey(t *testing.T) {
 
-	first := DefaultAwgConfig().HeaderProtectionKey
-	second := DefaultAwgConfig().HeaderProtectionKey
+	first := DefaultConfig().HeaderProtectionKey
+	second := DefaultConfig().HeaderProtectionKey
 
 	if first == second {
 		t.Errorf("want a new key for each config, got %s twice", first)
@@ -183,9 +183,9 @@ func TestNextPeerIPRejectsBadSubnet(t *testing.T) {
 
 func TestClientConfigHoldsServerParams(t *testing.T) {
 
-	cfg := DefaultAwgConfig()
+	cfg := DefaultConfig()
 	cfg.Port = 40001
-	cl := awgClient{
+	cl := client{
 		PrivateKey:      "Y2xpZW50",
 		IP:              netip.MustParseAddr("10.8.1.2"),
 		ServerPublicKey: "c2VydmVy",
@@ -223,10 +223,10 @@ func TestClientConfigHoldsServerParams(t *testing.T) {
 
 func TestClientConfigDropsEmptyValues(t *testing.T) {
 
-	cfg := DefaultAwgConfig()
+	cfg := DefaultConfig()
 	cfg.SpecialJunk1 = ""
 	cfg.RandomTrailers = ""
-	cl := awgClient{IP: netip.MustParseAddr("10.8.1.2")}
+	cl := client{IP: netip.MustParseAddr("10.8.1.2")}
 
 	conf := cfg.clientConfig(cl, "2001:db8::1")
 
@@ -240,5 +240,72 @@ func TestClientConfigDropsEmptyValues(t *testing.T) {
 	}
 	if !strings.Contains(conf, "Endpoint = [2001:db8::1]:55424\n") {
 		t.Errorf("want a bracketed IPv6 endpoint, got:\n%s", conf)
+	}
+}
+
+func TestConfigFromEnvReadsWhatEnvWrites(t *testing.T) {
+
+	cfg := DefaultConfig()
+	cfg.Name = "awg-test"
+	cfg.Port = 40001
+	cfg.RandomTrailers = ""
+
+	env := cfg.env()
+	env["PATH"] = "/usr/bin" // the image adds its own env
+
+	got, err := ConfigFromEnv("awg-test", env)
+	if err != nil {
+		t.Fatalf("config from env: %v", err)
+	}
+	if got != cfg {
+		t.Errorf("want\n%+v\ngot\n%+v", cfg, got)
+	}
+}
+
+func TestConfigFromEnvKeepsMissingTextEmpty(t *testing.T) {
+
+	env := DefaultConfig().env()
+	delete(env, "HEADER_PROTECTION_KEY")
+	delete(env, "SPECIAL_JUNK_1")
+
+	got, err := ConfigFromEnv("awg-test", env)
+	if err != nil {
+		t.Fatalf("config from env: %v", err)
+	}
+	if got.HeaderProtectionKey != "" || got.SpecialJunk1 != "" {
+		t.Errorf("want empty values, got %q and %q", got.HeaderProtectionKey, got.SpecialJunk1)
+	}
+}
+
+func TestConfigFromEnvRejectsBadEnv(t *testing.T) {
+
+	tests := []struct {
+		name  string
+		key   string
+		value string // empty value means: remove the key
+	}{
+		{"missing port", "AWG_SERVER_PORT", ""},
+		{"port too large", "AWG_SERVER_PORT", "70000"},
+		{"bad CIDR", "WIREGUARD_SUBNET_CIDR", "abc"},
+		{"missing junk count", "JUNK_PACKET_COUNT", ""},
+		{"missing subnet IP", "AWG_SUBNET_IP", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			env := DefaultConfig().env()
+			if tt.value == "" {
+				delete(env, tt.key)
+			} else {
+				env[tt.key] = tt.value
+			}
+
+			_, err := ConfigFromEnv("awg-test", env)
+			if !errors.Is(err, ErrBadEnv) {
+				t.Fatalf("want ErrBadEnv, got %v", err)
+			}
+			if !strings.Contains(err.Error(), tt.key) || !strings.Contains(err.Error(), "awg-test") {
+				t.Errorf("want the key and the container name in the error, got %v", err)
+			}
+		})
 	}
 }

@@ -12,13 +12,13 @@ import (
 	"maps"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
-	"github.com/paveltessman/jao/installer"
 )
 
 var ErrBuildContext = errors.New("can't create build context")
@@ -27,8 +27,7 @@ var ErrContainerCreate = errors.New("can't create container")
 var ErrContainerStart = errors.New("can't start container")
 var ErrContainerExec = errors.New("can't exec in container")
 var ErrContainerRemove = errors.New("can't remove container")
-
-var _ installer.ContainerAPI = (*Service)(nil)
+var ErrContainerList = errors.New("can't list containers")
 
 type Service struct {
 	client *client.Client
@@ -91,7 +90,7 @@ func (s *Service) ImageBuild(ctx context.Context, workdir fs.FS, imageTag string
 	return nil
 }
 
-func (s *Service) ContainerCreate(ctx context.Context, spec installer.ContainerSpec) (string, error) {
+func (s *Service) ContainerCreate(ctx context.Context, spec ContainerSpec) (string, error) {
 	cfg, hostCfg, err := toDocker(spec)
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", ErrContainerCreate, err)
@@ -162,9 +161,48 @@ func (s *Service) ContainerRemove(ctx context.Context, id string) error {
 	return nil
 }
 
-func toDocker(spec installer.ContainerSpec) (*container.Config, *container.HostConfig, error) {
+// ContainerList returns all containers that have the label key,
+// with any value. The list also holds the containers that do not run.
+func (s *Service) ContainerList(ctx context.Context, label string) ([]Container, error) {
+	list, err := s.client.ContainerList(ctx, client.ContainerListOptions{
+		All:     true,
+		Filters: client.Filters{}.Add("label", label),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrContainerList, err)
+	}
+
+	// The list does not hold the env, so each container needs an inspect.
+	var containers []Container
+	for _, item := range list.Items {
+		inspect, err := s.client.ContainerInspect(ctx, item.ID, client.ContainerInspectOptions{})
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrContainerList, err)
+		}
+		c := inspect.Container
+
+		env := map[string]string{}
+		if c.Config != nil {
+			for _, kv := range c.Config.Env {
+				key, value, _ := strings.Cut(kv, "=")
+				env[key] = value
+			}
+		}
+
+		containers = append(containers, Container{
+			ID:     c.ID,
+			Name:   strings.TrimPrefix(c.Name, "/"),
+			Labels: item.Labels,
+			Env:    env,
+		})
+	}
+	return containers, nil
+}
+
+func toDocker(spec ContainerSpec) (*container.Config, *container.HostConfig, error) {
 	cfg := container.Config{
 		Image:        spec.Image,
+		Labels:       spec.Labels,
 		ExposedPorts: network.PortSet{},
 	}
 	for _, key := range slices.Sorted(maps.Keys(spec.Env)) {

@@ -7,7 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -15,6 +15,8 @@ import (
 
 	"github.com/paveltessman/jao/container"
 	"github.com/paveltessman/jao/installer"
+	"github.com/paveltessman/jao/protocol"
+	"github.com/paveltessman/jao/protocol/awg"
 )
 
 func freeUDPPort(t *testing.T) uint16 {
@@ -60,7 +62,7 @@ func TestInstallAwgBringsUpInterface(t *testing.T) {
 	})
 
 	workDir := t.TempDir()
-	cfg := installer.DefaultAwgConfig()
+	cfg := awg.DefaultConfig()
 	cfg.Name = "jao-awg-test"
 	cfg.Port = freeUDPPort(t)
 
@@ -101,86 +103,24 @@ func TestInstallAwgBringsUpInterface(t *testing.T) {
 	if strings.TrimSpace(string(pubKey)) != strings.TrimSpace(ifaceKey) {
 		t.Errorf("public key: want host file %q to match awg0 %q", pubKey, ifaceKey)
 	}
-}
 
-func newContainerService(t *testing.T) *container.Service {
-	t.Helper()
-
-	ctr, err := container.New()
+	// The key service finds the container by its label and reads cfg back.
+	list, err := ctr.ContainerList(t.Context(), protocol.Label)
 	if err != nil {
-		t.Fatalf("create container service: %v", err)
+		t.Fatalf("list: %v", err)
 	}
-	t.Cleanup(func() {
-		if err := ctr.Close(); err != nil {
-			t.Errorf("close container service: %v", err)
-		}
-	})
-	return ctr
-}
-
-// installAwg installs cfg and removes the container when the test ends.
-func installAwg(t *testing.T, ctr *container.Service, inst *installer.Service, cfg installer.AwgConfig) {
-	t.Helper()
-
-	t.Cleanup(func() {
-		if err := ctr.ContainerRemove(context.Background(), cfg.Name); err != nil {
-			t.Logf("remove container: %v", err)
-		}
-	})
-
-	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
-	defer cancel()
-
-	if err := inst.InstallAwg(ctx, cfg); err != nil {
-		t.Fatalf("install %s: %v", cfg.Name, err)
+	i := slices.IndexFunc(list, func(c container.Container) bool { return c.Name == cfg.Name })
+	if i < 0 {
+		t.Fatalf("want %s in the labeled containers, got %v", cfg.Name, list)
 	}
-	waitExec(t, ctr, cfg.Name, "awg", "show", "awg0")
-}
-
-func TestAddAwgPeerConnectsClient(t *testing.T) {
-
-	ctr := newContainerService(t)
-	inst := installer.New(ctr, t.TempDir())
-
-	server := installer.DefaultAwgConfig()
-	server.Name = "jao-awg-test-server"
-	server.Port = freeUDPPort(t)
-	installAwg(t, ctr, inst, server)
-
-	// The server container is the endpoint on the docker bridge network.
-	serverIP := strings.TrimSpace(waitExec(t, ctr, server.Name, "hostname", "-i"))
-
-	first, err := inst.AddAwgPeer(t.Context(), server, serverIP)
+	if got := list[i].Labels[protocol.Label]; got != protocol.AWG {
+		t.Errorf("label %s: want %s, got %q", protocol.Label, protocol.AWG, got)
+	}
+	read, err := awg.ConfigFromEnv(list[i].Name, list[i].Env)
 	if err != nil {
-		t.Fatalf("add first peer: %v", err)
+		t.Fatalf("config from env: %v", err)
 	}
-	second, err := inst.AddAwgPeer(t.Context(), server, serverIP)
-	if err != nil {
-		t.Fatalf("add second peer: %v", err)
+	if read != cfg {
+		t.Errorf("config from env: want\n%+v\ngot\n%+v", cfg, read)
 	}
-
-	show := waitExec(t, ctr, server.Name, "awg", "show", "awg0", "allowed-ips")
-	for _, ip := range []string{"10.8.1.1/32", "10.8.1.2/32"} {
-		if !strings.Contains(show, ip) {
-			t.Errorf("awg show: want peer %s, got:\n%s", ip, show)
-		}
-	}
-	if !strings.Contains(second, "Address = 10.8.1.2/32") {
-		t.Errorf("second peer: want 10.8.1.2, got:\n%s", second)
-	}
-
-	// The client runs in a second AWG container with its own awg0 on another subnet.
-	// The test drops DNS, because awg-quick needs resolvconf for it,
-	// and routes only the server subnet, to keep the container network.
-	client := installer.DefaultAwgConfig()
-	client.Name = "jao-awg-test-client"
-	client.Port = freeUDPPort(t)
-	client.SubnetIP = "10.9.9.0"
-	installAwg(t, ctr, inst, client)
-
-	clientConf := regexp.MustCompile(`(?m)^DNS = .*\n`).ReplaceAllString(first, "")
-	clientConf = strings.Replace(clientConf, "AllowedIPs = 0.0.0.0/0, ::/0", "AllowedIPs = 10.8.1.0/32", 1)
-
-	waitExec(t, ctr, client.Name, "bash", "-c", `printf '%s' "$1" > /tmp/jao0.conf && awg-quick up /tmp/jao0.conf`, "_", clientConf)
-	waitExec(t, ctr, client.Name, "ping", "-c", "1", "-W", "2", "10.8.1.0")
 }

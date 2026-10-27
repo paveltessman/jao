@@ -2,7 +2,6 @@ package awg
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 )
@@ -12,23 +11,18 @@ type Execer interface {
 	ContainerExec(ctx context.Context, id string, cmd []string) (string, error)
 }
 
-var ErrNoEndpoint = errors.New("awg: endpoint host is empty")
-
 // addPeerScript appends the peer in $1 to awg0.conf and applies the file
 // to awg0 without a restart. The peer comes as an argument, not as part of
 // the script, so bash does not read it.
 const addPeerScript = `printf '%s' "$1" >> ` + confPath + ` && awg syncconf awg0 <(awg-quick strip ` + confPath + `)`
 
 // AddPeer adds a new peer to the AWG container from cfg and returns
-// the client config for it. endpointHost is the public address of the node.
+// the client config for it. endpointHost is the public address of the node,
+// and it must not be empty.
 // The client private key is not kept on the server.
 // The caller must make sure that two calls for one container do not run
 // at the same time, because the two peers can get the same IP.
 func AddPeer(ctx context.Context, ctr Execer, cfg Config, endpointHost string) (string, error) {
-	if endpointHost == "" {
-		return "", ErrNoEndpoint
-	}
-
 	serverConf, err := readFile(ctx, ctr, cfg.Name, confPath)
 	if err != nil {
 		return "", err

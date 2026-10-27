@@ -141,16 +141,3 @@ func TestAddPeerStopsOnFullSubnet(t *testing.T) {
 		t.Errorf("want no write on a full subnet, got %v", ctr.execs)
 	}
 }
-
-func TestAddPeerNeedsEndpoint(t *testing.T) {
-
-	ctr := &fakeExecer{files: serverFiles()}
-
-	_, err := AddPeer(t.Context(), ctr, DefaultConfig(), "")
-	if !errors.Is(err, ErrNoEndpoint) {
-		t.Errorf("want ErrNoEndpoint, got %v", err)
-	}
-	if len(ctr.execs) != 0 {
-		t.Errorf("want no write without an endpoint, got %v", ctr.execs)
-	}
-}

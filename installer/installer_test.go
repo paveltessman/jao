@@ -37,10 +37,6 @@ func (f *fakeContainerAPI) ContainerStart(_ context.Context, id string) error {
 	return nil
 }
 
-func (f *fakeContainerAPI) ContainerExec(_ context.Context, _ string, _ []string) (string, error) {
-	return "", nil
-}
-
 func TestInstallAwgCreatesContainerFromConfig(t *testing.T) {
 
 	ctr := &fakeContainerAPI{}

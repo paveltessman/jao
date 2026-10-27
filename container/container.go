@@ -18,7 +18,6 @@ import (
 	"github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/api/types/network"
 	"github.com/moby/moby/client"
-	"github.com/paveltessman/jao/installer"
 )
 
 var ErrBuildContext = errors.New("can't create build context")
@@ -27,8 +26,6 @@ var ErrContainerCreate = errors.New("can't create container")
 var ErrContainerStart = errors.New("can't start container")
 var ErrContainerExec = errors.New("can't exec in container")
 var ErrContainerRemove = errors.New("can't remove container")
-
-var _ installer.ContainerAPI = (*Service)(nil)
 
 type Service struct {
 	client *client.Client
@@ -91,7 +88,7 @@ func (s *Service) ImageBuild(ctx context.Context, workdir fs.FS, imageTag string
 	return nil
 }
 
-func (s *Service) ContainerCreate(ctx context.Context, spec installer.ContainerSpec) (string, error) {
+func (s *Service) ContainerCreate(ctx context.Context, spec ContainerSpec) (string, error) {
 	cfg, hostCfg, err := toDocker(spec)
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", ErrContainerCreate, err)
@@ -162,7 +159,7 @@ func (s *Service) ContainerRemove(ctx context.Context, id string) error {
 	return nil
 }
 
-func toDocker(spec installer.ContainerSpec) (*container.Config, *container.HostConfig, error) {
+func toDocker(spec ContainerSpec) (*container.Config, *container.HostConfig, error) {
 	cfg := container.Config{
 		Image:        spec.Image,
 		ExposedPorts: network.PortSet{},

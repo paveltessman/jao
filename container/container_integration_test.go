@@ -16,7 +16,6 @@ import (
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
-	"github.com/paveltessman/jao/installer"
 )
 
 func newService(t *testing.T) *Service {
@@ -60,7 +59,7 @@ const testImage = "jao/container-test:latest"
 // capNetAdmin is the bit of CAP_NET_ADMIN in the capability sets.
 const capNetAdmin = 12
 
-func startTestContainer(t *testing.T, svc *Service, spec installer.ContainerSpec) string {
+func startTestContainer(t *testing.T, svc *Service, spec ContainerSpec) string {
 	t.Helper()
 
 	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
@@ -129,15 +128,15 @@ func TestContainerCreateAppliesSpec(t *testing.T) {
 	}
 	hostPort := freeUDPPort(t)
 
-	id := startTestContainer(t, svc, installer.ContainerSpec{
+	id := startTestContainer(t, svc, ContainerSpec{
 		Name:    "jao-container-test",
 		Env:     map[string]string{"FOO": "bar"},
 		CapAdd:  []string{"NET_ADMIN"},
 		Devices: []string{"/dev/net/tun"},
-		Ports:   []installer.PortBinding{{HostPort: hostPort, ContainerPort: 4000, Protocol: installer.UDP}},
-		Mounts:  []installer.Mount{{Source: dataDir, Target: "/data"}},
+		Ports:   []PortBinding{{HostPort: hostPort, ContainerPort: 4000, Protocol: UDP}},
+		Mounts:  []Mount{{Source: dataDir, Target: "/data"}},
 		Sysctls: map[string]string{"net.ipv4.ip_forward": "1"},
-		Restart: installer.RestartUnlessStopped,
+		Restart: RestartUnlessStopped,
 	})
 
 	if got := exec(t, svc, id, "printenv", "FOO"); got != "bar" {
@@ -187,7 +186,7 @@ func TestContainerCreateAppliesSpec(t *testing.T) {
 func TestContainerExecFailsOnNonZeroExit(t *testing.T) {
 
 	svc := newService(t)
-	id := startTestContainer(t, svc, installer.ContainerSpec{})
+	id := startTestContainer(t, svc, ContainerSpec{})
 
 	_, err := svc.ContainerExec(t.Context(), id, []string{"sh", "-c", "echo oops >&2; exit 3"})
 	if !errors.Is(err, ErrContainerExec) {

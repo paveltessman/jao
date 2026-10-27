@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/paveltessman/jao/container"
 )
 
 const awgImageTag = "jao/awg:latest"
@@ -129,20 +131,20 @@ func (c AwgConfig) env() map[string]string {
 	}
 }
 
-func (c AwgConfig) spec(hostDataDir string) ContainerSpec {
-	return ContainerSpec{
+func (c AwgConfig) spec(hostDataDir string) container.ContainerSpec {
+	return container.ContainerSpec{
 		Name:    c.Name,
 		Image:   awgImageTag,
 		Env:     c.env(),
 		CapAdd:  []string{"NET_ADMIN", "SYS_MODULE"},
 		Devices: []string{"/dev/net/tun"},
-		Ports:   []PortBinding{{HostPort: c.Port, ContainerPort: c.Port, Protocol: UDP}},
-		Mounts:  []Mount{{Source: hostDataDir, Target: awgDataDir}},
+		Ports:   []container.PortBinding{{HostPort: c.Port, ContainerPort: c.Port, Protocol: container.UDP}},
+		Mounts:  []container.Mount{{Source: hostDataDir, Target: awgDataDir}},
 		Sysctls: map[string]string{
 			"net.ipv4.ip_forward":              "1",
 			"net.ipv4.conf.all.src_valid_mark": "1",
 		},
-		Restart: RestartUnlessStopped,
+		Restart: container.RestartUnlessStopped,
 	}
 }
 

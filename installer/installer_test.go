@@ -13,6 +13,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/paveltessman/jao/container"
 )
 
 type fakeContainerAPI struct {
@@ -21,7 +23,7 @@ type fakeContainerAPI struct {
 	files    map[string]string // `cat <path>` returns files[path]
 
 	builtTag  string
-	created   []ContainerSpec
+	created   []container.ContainerSpec
 	startedID string
 	execs     [][]string // all commands other than `cat`
 }
@@ -31,7 +33,7 @@ func (f *fakeContainerAPI) ImageBuild(_ context.Context, _ fs.FS, imageTag strin
 	return f.buildErr
 }
 
-func (f *fakeContainerAPI) ContainerCreate(_ context.Context, spec ContainerSpec) (string, error) {
+func (f *fakeContainerAPI) ContainerCreate(_ context.Context, spec container.ContainerSpec) (string, error) {
 	f.created = append(f.created, spec)
 	return "ctr-1", nil
 }
@@ -97,13 +99,13 @@ func TestInstallAwgCreatesContainerFromConfig(t *testing.T) {
 		}
 	}
 
-	wantPort := PortBinding{HostPort: 40001, ContainerPort: 40001, Protocol: UDP}
-	if !slices.Equal(spec.Ports, []PortBinding{wantPort}) {
+	wantPort := container.PortBinding{HostPort: 40001, ContainerPort: 40001, Protocol: container.UDP}
+	if !slices.Equal(spec.Ports, []container.PortBinding{wantPort}) {
 		t.Errorf("ports: want [%v], got %v", wantPort, spec.Ports)
 	}
 
-	wantMount := Mount{Source: filepath.Join(workDir, "awg-test"), Target: "/opt/amnezia/awg"}
-	if !slices.Equal(spec.Mounts, []Mount{wantMount}) {
+	wantMount := container.Mount{Source: filepath.Join(workDir, "awg-test"), Target: "/opt/amnezia/awg"}
+	if !slices.Equal(spec.Mounts, []container.Mount{wantMount}) {
 		t.Errorf("mounts: want [%v], got %v", wantMount, spec.Mounts)
 	}
 	info, err := os.Stat(wantMount.Source)
@@ -123,7 +125,7 @@ func TestInstallAwgCreatesContainerFromConfig(t *testing.T) {
 	if spec.Sysctls["net.ipv4.ip_forward"] != "1" {
 		t.Errorf("sysctls: want ip_forward=1, got %v", spec.Sysctls)
 	}
-	if spec.Restart != RestartUnlessStopped {
+	if spec.Restart != container.RestartUnlessStopped {
 		t.Errorf("restart: want unless-stopped, got %q", spec.Restart)
 	}
 }

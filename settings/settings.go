@@ -6,7 +6,6 @@ import "os"
 const envWorkDir = "JAO_WORKING_DIR"
 
 // envPublicHost holds the public IP or domain of the node.
-// The client configs use it as the endpoint. It has no default.
 const envPublicHost = "JAO_PUBLIC_HOST"
 
 const defaultWorkDir = "/opt/jao"

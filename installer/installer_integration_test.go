@@ -113,8 +113,8 @@ func TestInstallAwgBringsUpInterface(t *testing.T) {
 	if i < 0 {
 		t.Fatalf("want %s in the labeled containers, got %v", cfg.Name, list)
 	}
-	if got := list[i].Labels[protocol.Label]; got != protocol.AWG {
-		t.Errorf("label %s: want %s, got %q", protocol.Label, protocol.AWG, got)
+	if got := list[i].Labels[protocol.Label]; got != protocol.AWGLabel {
+		t.Errorf("label %s: want %s, got %q", protocol.Label, protocol.AWGLabel, got)
 	}
 	read, err := awg.ConfigFromEnv(list[i].Name, list[i].Env)
 	if err != nil {

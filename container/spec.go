@@ -22,24 +22,23 @@ type Container struct {
 	Env    map[string]string
 }
 
-type Protocol string
+type NetProto string
 
 const (
-	TCP Protocol = "tcp"
-	UDP Protocol = "udp"
+	TCP NetProto = "tcp"
+	UDP NetProto = "udp"
 )
 
 // PortBinding publishes a container port on a host port.
 type PortBinding struct {
 	HostPort      uint16
 	ContainerPort uint16
-	Protocol      Protocol
+	Protocol      NetProto
 }
 
-// Mount binds a host directory to a path in the container.
 type Mount struct {
-	Source string
-	Target string
+	HostPath      string
+	ContainerPath string
 }
 
 type RestartPolicy string

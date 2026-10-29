@@ -143,7 +143,7 @@ func TestContainerCreateAppliesSpec(t *testing.T) {
 		CapAdd:  []string{"NET_ADMIN"},
 		Devices: []string{"/dev/net/tun"},
 		Ports:   []PortBinding{{HostPort: hostPort, ContainerPort: 4000, Protocol: UDP}},
-		Mounts:  []Mount{{Source: dataDir, Target: "/data"}},
+		Mounts:  []Mount{{HostPath: dataDir, ContainerPath: "/data"}},
 		Sysctls: map[string]string{"net.ipv4.ip_forward": "1"},
 		Restart: RestartUnlessStopped,
 	})

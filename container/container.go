@@ -119,7 +119,6 @@ func (s *Service) ContainerStart(ctx context.Context, id string) error {
 }
 
 // ContainerExec runs cmd in the container and returns its stdout.
-// A non-zero exit code is an error that holds the stderr.
 func (s *Service) ContainerExec(ctx context.Context, id string, cmd []string) (string, error) {
 	exec, err := s.client.ExecCreate(ctx, id, client.ExecCreateOptions{
 		Cmd:          cmd,
@@ -152,7 +151,6 @@ func (s *Service) ContainerExec(ctx context.Context, id string, cmd []string) (s
 	return stdout.String(), nil
 }
 
-// ContainerRemove stops the container if it runs and removes it.
 func (s *Service) ContainerRemove(ctx context.Context, id string) error {
 	_, err := s.client.ContainerRemove(ctx, id, client.ContainerRemoveOptions{Force: true})
 	if err != nil {
@@ -163,10 +161,10 @@ func (s *Service) ContainerRemove(ctx context.Context, id string) error {
 
 // ContainerList returns all containers that have the label key,
 // with any value. The list also holds the containers that do not run.
-func (s *Service) ContainerList(ctx context.Context, label string) ([]Container, error) {
+func (s *Service) ContainerList(ctx context.Context, labelKey string) ([]Container, error) {
 	list, err := s.client.ContainerList(ctx, client.ContainerListOptions{
 		All:     true,
-		Filters: client.Filters{}.Add("label", label),
+		Filters: client.Filters{}.Add("label", labelKey),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrContainerList, err)
@@ -225,8 +223,8 @@ func toDocker(spec ContainerSpec) (*container.Config, *container.HostConfig, err
 	for _, m := range spec.Mounts {
 		hostCfg.Mounts = append(hostCfg.Mounts, mount.Mount{
 			Type:   mount.TypeBind,
-			Source: m.Source,
-			Target: m.Target,
+			Source: m.HostPath,
+			Target: m.ContainerPath,
 		})
 	}
 	for _, pb := range spec.Ports {

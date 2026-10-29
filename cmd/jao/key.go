@@ -10,16 +10,11 @@ import (
 	"github.com/paveltessman/jao/settings"
 )
 
-// runKey takes an optional container name. Without it, the node must have
-// exactly one protocol container.
 func runKey(ctx context.Context, cfg settings.Settings, args []string) error {
-	if len(args) > 1 {
-		return errors.New("usage: jao key [name]")
+	if len(args) != 1 {
+		return errors.New("usage: jao key <protocol name>")
 	}
-	var name string
-	if len(args) == 1 {
-		name = args[0]
-	}
+	name := args[0]
 
 	ctr, closeFn, err := newContainerService(ctx)
 	if err != nil {

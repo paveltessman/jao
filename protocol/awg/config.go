@@ -17,13 +17,11 @@ import (
 	"github.com/paveltessman/jao/protocol"
 )
 
-// ImageTag is the tag of the image that BuildContext builds.
 const ImageTag = "jao/awg:latest"
 
-// dataDir is the dir in the container with the server keys and awg0.conf.
+// dataDir is the dir in the container.
 const dataDir = "/opt/amnezia/awg"
 
-// Files that configure_container.sh makes in dataDir.
 const (
 	confPath            = dataDir + "/awg0.conf"
 	serverPublicKeyPath = dataDir + "/wireguard_server_public_key.key"
@@ -66,8 +64,6 @@ type Config struct {
 	SpecialJunk1 string
 }
 
-// DefaultConfig returns the Amnezia defaults with a random junk packet count
-// and a new header protection key.
 func DefaultConfig() Config {
 	return Config{
 		Name:       "jao-awg",
@@ -137,10 +133,6 @@ func (c Config) env() map[string]string {
 
 var ErrBadEnv = errors.New("awg: bad container env")
 
-// ConfigFromEnv reads the config of the container with the given name
-// from its env. It is the reverse of env. The env can also hold other keys.
-// A missing text value is empty, because each AWG parameter is optional.
-// A missing number is an error.
 func ConfigFromEnv(name string, env map[string]string) (Config, error) {
 	r := envReader{env: env}
 	cfg := Config{
@@ -183,7 +175,6 @@ func ConfigFromEnv(name string, env map[string]string) (Config, error) {
 	return cfg, nil
 }
 
-// envReader reads values from an env and keeps the first error.
 type envReader struct {
 	env map[string]string
 	err error
@@ -209,18 +200,16 @@ func (r *envReader) port(key string) uint16 {
 	return uint16(n)
 }
 
-// Spec returns the container spec for c. The server keys stay
-// in hostDataDir on the host.
 func (c Config) Spec(hostDataDir string) container.ContainerSpec {
 	return container.ContainerSpec{
 		Name:    c.Name,
 		Image:   ImageTag,
-		Labels:  map[string]string{protocol.Label: protocol.AWG},
+		Labels:  map[string]string{protocol.Label: protocol.AWGLabel},
 		Env:     c.env(),
 		CapAdd:  []string{"NET_ADMIN", "SYS_MODULE"},
 		Devices: []string{"/dev/net/tun"},
 		Ports:   []container.PortBinding{{HostPort: c.Port, ContainerPort: c.Port, Protocol: container.UDP}},
-		Mounts:  []container.Mount{{Source: hostDataDir, Target: dataDir}},
+		Mounts:  []container.Mount{{HostPath: hostDataDir, ContainerPath: dataDir}},
 		Sysctls: map[string]string{
 			"net.ipv4.ip_forward":              "1",
 			"net.ipv4.conf.all.src_valid_mark": "1",
@@ -229,14 +218,10 @@ func (c Config) Spec(hostDataDir string) container.ContainerSpec {
 	}
 }
 
-// genKey makes a key in the same format as `awg genkey`:
-// a clamped Curve25519 private key in base64.
 func genKey() string {
 	return base64.StdEncoding.EncodeToString(newPrivateKey())
 }
 
-// genKeyPair makes a client key pair in base64,
-// the same as `awg genkey` and `awg pubkey`.
 func genKeyPair() (private, public string, err error) {
 	key, err := ecdh.X25519().NewPrivateKey(newPrivateKey())
 	if err != nil {
@@ -258,9 +243,6 @@ var ErrSubnetFull = errors.New("awg: no free IP in the subnet")
 
 var allowedIPRe = regexp.MustCompile(`(?m)^\s*AllowedIPs\s*=\s*(\d+\.\d+\.\d+\.\d+)`)
 
-// nextPeerIP returns the lowest IP in the subnet that no peer in serverConf uses.
-// The server uses the network address, so the search starts after it.
-// The broadcast address is never given to a peer.
 func nextPeerIP(serverConf string, subnetIP string, subnetCIDR int) (netip.Addr, error) {
 	addr, err := netip.ParseAddr(subnetIP)
 	if err != nil {
@@ -286,7 +268,6 @@ func nextPeerIP(serverConf string, subnetIP string, subnetCIDR int) (netip.Addr,
 	return netip.Addr{}, fmt.Errorf("%w: %s", ErrSubnetFull, subnet)
 }
 
-// Client config defaults from the Amnezia client.
 const (
 	clientDNS        = "1.1.1.1, 1.0.0.1"
 	clientAllowedIPs = "0.0.0.0/0, ::/0"
@@ -301,9 +282,7 @@ type client struct {
 	PresharedKey    string
 }
 
-// clientConfig makes the config that the user imports into the AmneziaVPN app.
-// It has the layout of server_scripts/awg/template.conf in the Amnezia client.
-// A line with an empty value is dropped, because each AWG parameter is optional.
+// clientConfig makes the config that the user imports into their app.
 func (c Config) clientConfig(cl client, endpointHost string) string {
 	iface := [][2]string{
 		{"Address", cl.IP.String() + "/32"},

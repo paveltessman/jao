@@ -206,7 +206,7 @@ func TestDiscoverSkipsUnknownProtocols(t *testing.T) {
 		t.Fatalf("discover: %v", err)
 	}
 
-	want := []Installed{{Name: "awg-a", Protocol: protocol.AWG}, {Name: "awg-b", Protocol: protocol.AWG}}
+	want := []Installed{{Name: "awg-a", Protocol: protocol.AWGLabel}, {Name: "awg-b", Protocol: protocol.AWGLabel}}
 	if !slices.Equal(got, want) {
 		t.Errorf("want %v, got %v", want, got)
 	}

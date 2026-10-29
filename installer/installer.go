@@ -30,14 +30,13 @@ func New(ctr ContainerAPI, workDir string) *Service {
 }
 
 // InstallAwg builds the AWG image and starts a container from cfg.
-// The server keys stay in <workDir>/<cfg.Name> on the host.
 func (s *Service) InstallAwg(ctx context.Context, cfg awg.Config) error {
 	buildCtx, err := awg.BuildContext()
 	if err != nil {
 		return err
 	}
 
-	dataDir, err := s.dataDir(cfg.Name)
+	dataDir, err := s.createDataDir(cfg.Name)
 	if err != nil {
 		return err
 	}
@@ -60,9 +59,8 @@ func (s *Service) InstallAwg(ctx context.Context, cfg awg.Config) error {
 	return nil
 }
 
-// dataDir creates the host dir for a container and returns its absolute path.
-// Docker needs an absolute path for a bind mount.
-func (s *Service) dataDir(name string) (string, error) {
+// createDataDir creates the host dir for a container and returns its absolute path.
+func (s *Service) createDataDir(name string) (string, error) {
 	dir, err := filepath.Abs(filepath.Join(s.workDir, name))
 	if err != nil {
 		return "", fmt.Errorf("installer: can't resolve data dir for %s: %w", name, err)

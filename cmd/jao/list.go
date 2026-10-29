@@ -31,9 +31,7 @@ func runList(ctx context.Context, cfg settings.Settings, args []string) error {
 	return printInstalled(os.Stdout, installed)
 }
 
-// printInstalled writes a table with a header and one row for each container.
 func printInstalled(w io.Writer, installed []keys.Installed) error {
-	// The tabwriter keeps the rows in memory, and Flush returns the write error.
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	_, _ = fmt.Fprintln(tw, "NAME\tPROTOCOL")
 	for _, inst := range installed {

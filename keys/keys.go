@@ -82,7 +82,7 @@ func (s *Service) CreateKey(ctx context.Context, name string) (string, error) {
 	defer s.peerMu.Unlock()
 
 	switch c.Labels[protocol.Label] {
-	case protocol.AWG:
+	case protocol.AWGLabel:
 		cfg, err := awg.ConfigFromEnv(c.Name, c.Env)
 		if err != nil {
 			return "", err
@@ -103,7 +103,7 @@ func (s *Service) discover(ctx context.Context) ([]container.Container, error) {
 	var found []container.Container
 	for _, c := range list {
 		switch c.Labels[protocol.Label] {
-		case protocol.AWG:
+		case protocol.AWGLabel:
 			found = append(found, c)
 		}
 	}

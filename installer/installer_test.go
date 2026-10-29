@@ -60,8 +60,8 @@ func TestInstallAwgCreatesContainerFromConfig(t *testing.T) {
 	if spec.Name != "awg-test" {
 		t.Errorf("name: want awg-test, got %s", spec.Name)
 	}
-	if got := spec.Labels[protocol.Label]; got != protocol.AWG {
-		t.Errorf("label %s: want %s, got %q", protocol.Label, protocol.AWG, got)
+	if got := spec.Labels[protocol.Label]; got != protocol.AWGLabel {
+		t.Errorf("label %s: want %s, got %q", protocol.Label, protocol.AWGLabel, got)
 	}
 	if ctr.startedID != "ctr-1" {
 		t.Errorf("start: want ctr-1, got %q", ctr.startedID)
@@ -87,11 +87,11 @@ func TestInstallAwgCreatesContainerFromConfig(t *testing.T) {
 		t.Errorf("ports: want [%v], got %v", wantPort, spec.Ports)
 	}
 
-	wantMount := container.Mount{Source: filepath.Join(workDir, "awg-test"), Target: "/opt/amnezia/awg"}
+	wantMount := container.Mount{HostPath: filepath.Join(workDir, "awg-test"), ContainerPath: "/opt/amnezia/awg"}
 	if !slices.Equal(spec.Mounts, []container.Mount{wantMount}) {
 		t.Errorf("mounts: want [%v], got %v", wantMount, spec.Mounts)
 	}
-	info, err := os.Stat(wantMount.Source)
+	info, err := os.Stat(wantMount.HostPath)
 	if err != nil {
 		t.Fatalf("data dir: %v", err)
 	}

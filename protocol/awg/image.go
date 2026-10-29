@@ -9,7 +9,6 @@ import (
 //go:embed image/*
 var image embed.FS
 
-// BuildContext returns the Docker build context of the AWG image.
 func BuildContext() (fs.FS, error) {
 	sub, err := fs.Sub(image, "image")
 	if err != nil {

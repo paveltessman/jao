@@ -30,7 +30,7 @@ func TestKeyFailsOnExtraArgs(t *testing.T) {
 	if err == nil {
 		t.Fatal("do returned no error, want one")
 	}
-	if !strings.Contains(err.Error(), "jao key [name]") {
+	if !strings.Contains(err.Error(), "jao key <protocol name>") {
 		t.Errorf("error = %q, want the usage", err)
 	}
 }

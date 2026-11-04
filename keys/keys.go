@@ -28,8 +28,8 @@ var ErrNotFound = errors.New("keys: protocol not found")
 
 // Installed describes a protocol container on the node.
 type Installed struct {
-	Name     string
-	Protocol string
+	Name     string `json:"name"`
+	Protocol string `json:"proto"`
 }
 
 type Service struct {

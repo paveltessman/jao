@@ -40,8 +40,8 @@ type Service struct {
 	peerMu sync.Mutex
 }
 
-// New returns a key service. endpointHost is the public address of the node.
-func New(ctr ContainerAPI, endpointHost string) *Service {
+// NewService returns a key service. endpointHost is the public address of the node.
+func NewService(ctr ContainerAPI, endpointHost string) *Service {
 	svc := Service{ctr: ctr, endpointHost: endpointHost}
 	return &svc
 }

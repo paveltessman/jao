@@ -22,7 +22,7 @@ func runKey(ctx context.Context, cfg settings.Settings, args []string) error {
 	}
 	defer closeFn()
 
-	clientConf, err := keys.New(ctr, cfg.PublicHost).CreateKey(ctx, name)
+	clientConf, err := keys.NewService(ctr, cfg.PublicHost).CreateKey(ctx, name)
 	if err != nil {
 		return err
 	}

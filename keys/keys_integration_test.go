@@ -94,7 +94,7 @@ func TestCreateKeyConnectsClient(t *testing.T) {
 	serverIP := strings.TrimSpace(waitExec(t, ctr, server.Name, "hostname", "-i"))
 
 	// The service reads the server config from the container, not from server.
-	svc := keys.New(ctr, serverIP)
+	svc := keys.NewService(ctr, serverIP)
 	first, err := svc.CreateKey(t.Context(), server.Name)
 	if err != nil {
 		t.Fatalf("create first key: %v", err)

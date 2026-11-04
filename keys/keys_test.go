@@ -91,7 +91,7 @@ func TestCreateKeyUsesServerParamsFromContainer(t *testing.T) {
 		files:      serverFiles(),
 	}
 
-	clientConf, err := New(ctr, "203.0.113.7").CreateKey(t.Context(), "")
+	clientConf, err := NewService(ctr, "203.0.113.7").CreateKey(t.Context(), "")
 	if err != nil {
 		t.Fatalf("create key: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestCreateKeyPicksContainerByName(t *testing.T) {
 		files:      serverFiles(),
 	}
 
-	if _, err := New(ctr, "203.0.113.7").CreateKey(t.Context(), "awg-b"); err != nil {
+	if _, err := NewService(ctr, "203.0.113.7").CreateKey(t.Context(), "awg-b"); err != nil {
 		t.Fatalf("create key: %v", err)
 	}
 	if !slices.Equal(ctr.execIDs, []string{"awg-b"}) {
@@ -132,13 +132,13 @@ func TestCreateKeyPicksContainerByName(t *testing.T) {
 func TestCreateKeyNeedsOneContainerWithoutName(t *testing.T) {
 
 	ctr := &fakeContainerAPI{files: serverFiles()}
-	_, err := New(ctr, "203.0.113.7").CreateKey(t.Context(), "")
+	_, err := NewService(ctr, "203.0.113.7").CreateKey(t.Context(), "")
 	if !errors.Is(err, ErrNoProtocol) {
 		t.Errorf("no containers: want ErrNoProtocol, got %v", err)
 	}
 
 	ctr.containers = []container.Container{awgContainer(t, awgConfig("awg-b")), awgContainer(t, awgConfig("awg-a"))}
-	_, err = New(ctr, "203.0.113.7").CreateKey(t.Context(), "")
+	_, err = NewService(ctr, "203.0.113.7").CreateKey(t.Context(), "")
 	if !errors.Is(err, ErrManyProtocols) {
 		t.Fatalf("two containers: want ErrManyProtocols, got %v", err)
 	}
@@ -157,7 +157,7 @@ func TestCreateKeyFailsOnUnknownName(t *testing.T) {
 		files:      serverFiles(),
 	}
 
-	_, err := New(ctr, "203.0.113.7").CreateKey(t.Context(), "nope")
+	_, err := NewService(ctr, "203.0.113.7").CreateKey(t.Context(), "nope")
 	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("want ErrNotFound, got %v", err)
 	}
@@ -170,7 +170,7 @@ func TestCreateKeyNeedsEndpoint(t *testing.T) {
 		files:      serverFiles(),
 	}
 
-	_, err := New(ctr, "").CreateKey(t.Context(), "")
+	_, err := NewService(ctr, "").CreateKey(t.Context(), "")
 	if !errors.Is(err, ErrNoEndpoint) {
 		t.Errorf("want ErrNoEndpoint, got %v", err)
 	}
@@ -185,7 +185,7 @@ func TestCreateKeyStopsOnBadEnv(t *testing.T) {
 	delete(c.Env, "AWG_SERVER_PORT")
 	ctr := &fakeContainerAPI{containers: []container.Container{c}, files: serverFiles()}
 
-	_, err := New(ctr, "203.0.113.7").CreateKey(t.Context(), "")
+	_, err := NewService(ctr, "203.0.113.7").CreateKey(t.Context(), "")
 	if !errors.Is(err, awg.ErrBadEnv) {
 		t.Errorf("want awg.ErrBadEnv, got %v", err)
 	}
@@ -201,7 +201,7 @@ func TestDiscoverSkipsUnknownProtocols(t *testing.T) {
 		containers: []container.Container{awgContainer(t, awgConfig("awg-b")), unknown, awgContainer(t, awgConfig("awg-a"))},
 	}
 
-	got, err := New(ctr, "203.0.113.7").Discover(t.Context())
+	got, err := NewService(ctr, "203.0.113.7").Discover(t.Context())
 	if err != nil {
 		t.Fatalf("discover: %v", err)
 	}
@@ -217,7 +217,7 @@ func TestDiscoverStopsOnListError(t *testing.T) {
 	listErr := errors.New("docker is down")
 	ctr := &fakeContainerAPI{listErr: listErr}
 
-	_, err := New(ctr, "203.0.113.7").Discover(t.Context())
+	_, err := NewService(ctr, "203.0.113.7").Discover(t.Context())
 	if !errors.Is(err, listErr) {
 		t.Errorf("want list error, got %v", err)
 	}

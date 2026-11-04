@@ -13,5 +13,7 @@ func runServe(ctx context.Context, cfg settings.Settings, args []string) error {
 		return errors.New("usage: jao list")
 	}
 
-	return httpapi.Serve(ctx, cfg)
+	deps := httpapi.Deps{}
+
+	return httpapi.Serve(ctx, cfg, deps)
 }

@@ -14,7 +14,7 @@ import (
 
 var ErrHTTP = errors.New("http server error")
 
-func Serve(ctx context.Context, cfg settings.Settings) error {
+func Serve(ctx context.Context, cfg settings.Settings, deps Deps) error {
 
 	listener, err := net.Listen("tcp", cfg.HttpListenAddr)
 	if err != nil {
@@ -22,7 +22,7 @@ func Serve(ctx context.Context, cfg settings.Settings) error {
 	}
 
 	srv := &http.Server{
-		Handler:           router(),
+		Handler:           mainRoute(deps),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,

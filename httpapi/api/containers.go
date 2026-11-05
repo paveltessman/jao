@@ -1,59 +1,39 @@
 package api
 
 import (
-	"log"
+	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/paveltessman/jao/httpapi/shared"
 )
 
-func listContainers(deps shared.Deps) http.Handler {
-	handler := func(w http.ResponseWriter, r *http.Request) {
+var ErrBadPathValue = errors.New("bad path value")
+
+func listContainers(deps shared.Deps) EndpointFunc {
+	endpoint := func(r *http.Request) (Payload, error) {
 		installed, err := deps.KeyService.Discover(r.Context())
 		if err != nil {
-			log.Println(err)
-			writeJSON(w, http.StatusInternalServerError, Response{
-				Success: false,
-				Error:   "internal server error",
-			})
-			return
-
+			return nil, err
 		}
-
-		writeJSON(w, http.StatusOK, Response{
-			Success: true,
-			Data:    installed,
-		})
+		return installed, nil
 	}
-
-	return http.HandlerFunc(handler)
+	return endpoint
 }
 
-func createKey(deps shared.Deps) http.Handler {
-	handler := func(w http.ResponseWriter, r *http.Request) {
+func createKey(deps shared.Deps) EndpointFunc {
+	endpoint := func(r *http.Request) (Payload, error) {
 		containerName := r.PathValue("name")
 		if len(containerName) == 0 {
-			writeJSON(w, http.StatusBadRequest, Response{
-				Success: false,
-				Error:   "container name is not specified",
-			})
-			return
+			return nil, fmt.Errorf("%w: container name is not specified", ErrBadPathValue)
 		}
 
 		clientConf, err := deps.KeyService.CreateKey(r.Context(), containerName)
 		if err != nil {
-			log.Println(err)
-			writeJSON(w, http.StatusInternalServerError, Response{
-				Success: false,
-				Error:   "internal server error, see details in the server logs",
-			})
-			return
+			return nil, err
 		}
 
-		writeJSON(w, http.StatusOK, Response{
-			Success: true,
-			Data:    clientConf,
-		})
+		return clientConf, err
 	}
-	return http.HandlerFunc(handler)
+	return endpoint
 }

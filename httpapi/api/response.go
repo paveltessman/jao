@@ -15,16 +15,6 @@ type Response struct {
 	Error   string  `json:"error,omitempty"`
 }
 
-func writeJSON(w http.ResponseWriter, status int, payload Response) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-
-	if err := json.NewEncoder(w).Encode(payload); err != nil {
-		log.Println(err)
-		http.Error(w, `{"success": false, "error": "failed to encode response"}`, http.StatusInternalServerError)
-	}
-}
-
 func Wrap(endpoint EndpointFunc) http.Handler {
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -42,23 +32,12 @@ func Wrap(endpoint EndpointFunc) http.Handler {
 	return http.HandlerFunc(handler)
 }
 
-func statusCode(err error) int {
-	if err == nil {
-		return http.StatusOK
-	}
-	return http.StatusInternalServerError
-}
+func writeJSON(w http.ResponseWriter, status int, payload Response) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
 
-func errorMessage(err error) string {
-	if err == nil {
-		return ""
+	if err := json.NewEncoder(w).Encode(payload); err != nil {
+		log.Println(err)
+		http.Error(w, `{"success": false, "error": "failed to encode response"}`, http.StatusInternalServerError)
 	}
-	return "internal server error"
-}
-
-func logError(err error) {
-	if err == nil {
-		return
-	}
-	log.Println(err)
 }

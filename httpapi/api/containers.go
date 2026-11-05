@@ -1,14 +1,11 @@
 package api
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/paveltessman/jao/httpapi/shared"
 )
-
-var ErrBadPathValue = errors.New("bad path value")
 
 func listContainers(deps shared.Deps) EndpointFunc {
 	endpoint := func(r *http.Request) (Payload, error) {

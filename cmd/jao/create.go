@@ -10,9 +10,9 @@ import (
 	"github.com/paveltessman/jao/settings"
 )
 
-func runKey(ctx context.Context, cfg settings.Settings, args []string) error {
+func runCreate(ctx context.Context, cfg settings.Settings, args []string) error {
 	if len(args) != 1 {
-		return errors.New("usage: jao key <protocol name>")
+		return errors.New("usage: jao create <protocol name>")
 	}
 	name := args[0]
 

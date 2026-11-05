@@ -21,7 +21,7 @@ type command struct {
 func commands() []command {
 	commands := []command{
 		{"install", "install the AWG container", runInstall},
-		{"key", "create a key in a protocol container and print its client config", runKey},
+		{"create", "create a key in a protocol container and print its client config", runCreate},
 		{"list", "list the protocol containers on the node", runList},
 		{"serve", "run the http server", runServe},
 	}

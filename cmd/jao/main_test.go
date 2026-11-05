@@ -26,11 +26,11 @@ func TestDoFailsOnUnknownSubcommand(t *testing.T) {
 }
 
 func TestKeyFailsOnExtraArgs(t *testing.T) {
-	err := do(t.Context(), []string{"key", "a", "b"})
+	err := do(t.Context(), []string{"create", "a", "b"})
 	if err == nil {
 		t.Fatal("do returned no error, want one")
 	}
-	if !strings.Contains(err.Error(), "jao key <protocol name>") {
+	if !strings.Contains(err.Error(), "jao create <protocol name>") {
 		t.Errorf("error = %q, want the usage", err)
 	}
 }

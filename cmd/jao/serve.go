@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/paveltessman/jao/httpapi"
+	"github.com/paveltessman/jao/httpapi/shared"
 	"github.com/paveltessman/jao/keys"
 	"github.com/paveltessman/jao/settings"
 )
@@ -20,7 +21,7 @@ func runServe(ctx context.Context, cfg settings.Settings, args []string) error {
 	}
 	defer closeFn()
 
-	deps := httpapi.NewDeps(
+	deps := shared.NewDeps(
 		keys.NewService(ctr, cfg.PublicHost),
 	)
 

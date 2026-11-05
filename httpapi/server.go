@@ -9,12 +9,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/paveltessman/jao/httpapi/shared"
 	"github.com/paveltessman/jao/settings"
 )
 
 var ErrHTTP = errors.New("http server error")
 
-func Serve(ctx context.Context, cfg settings.Settings, deps Deps) error {
+func Serve(ctx context.Context, cfg settings.Settings, deps shared.Deps) error {
 
 	listener, err := net.Listen("tcp", cfg.HttpListenAddr)
 	if err != nil {

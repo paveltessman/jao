@@ -1,8 +1,6 @@
 package api
 
 import (
-	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 
@@ -14,17 +12,18 @@ func listContainers(deps shared.Deps) http.Handler {
 		installed, err := deps.KeyService.Discover(r.Context())
 		if err != nil {
 			log.Println(err)
-			http.Error(w, "internal server error", http.StatusInternalServerError)
+			writeJSON(w, http.StatusInternalServerError, Response{
+				Success: false,
+				Error:   "internal server error",
+			})
 			return
 
 		}
 
-		err = json.NewEncoder(w).Encode(installed)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, "internal server error", http.StatusInternalServerError)
-			return
-		}
+		writeJSON(w, http.StatusOK, Response{
+			Success: true,
+			Data:    installed,
+		})
 	}
 
 	return http.HandlerFunc(handler)
@@ -34,18 +33,27 @@ func createKey(deps shared.Deps) http.Handler {
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		containerName := r.PathValue("name")
 		if len(containerName) == 0 {
-			http.Error(w, "container name is not specified", http.StatusBadRequest)
+			writeJSON(w, http.StatusBadRequest, Response{
+				Success: false,
+				Error:   "container name is not specified",
+			})
+			return
 		}
 
 		clientConf, err := deps.KeyService.CreateKey(r.Context(), containerName)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-		}
-		_, err = fmt.Fprint(w, clientConf)
-		if err != nil {
 			log.Println(err)
-			http.Error(w, "internal server error", http.StatusInternalServerError)
+			writeJSON(w, http.StatusInternalServerError, Response{
+				Success: false,
+				Error:   "internal server error, see details in the server logs",
+			})
+			return
 		}
+
+		writeJSON(w, http.StatusOK, Response{
+			Success: true,
+			Data:    clientConf,
+		})
 	}
 	return http.HandlerFunc(handler)
 }

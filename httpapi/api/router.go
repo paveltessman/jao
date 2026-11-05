@@ -6,11 +6,17 @@ import (
 	"github.com/paveltessman/jao/httpapi/shared"
 )
 
+type Service struct {
+	deps shared.Deps
+}
+
 func Route(deps shared.Deps) http.Handler {
 	mux := http.NewServeMux()
 
-	mux.Handle("POST /containers/{name}/", Wrap(createKey(deps)))
-	mux.Handle("GET /containers", Wrap(listContainers(deps)))
+	svc := Service{deps}
+
+	mux.Handle("POST /containers/{name}/", Wrap(svc.createKey))
+	mux.Handle("GET /containers", Wrap(svc.listContainers))
 
 	return mux
 }

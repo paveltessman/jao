@@ -23,7 +23,6 @@ var _ ContainerAPI = (*container.Service)(nil)
 
 var ErrNoEndpoint = errors.New("keys: endpoint host is empty")
 var ErrNoProtocol = errors.New("keys: no protocol is installed")
-var ErrManyProtocols = errors.New("keys: more than one protocol is installed, give a name")
 var ErrNotFound = errors.New("keys: protocol not found")
 
 // Installed describes a protocol container on the node.
@@ -69,11 +68,11 @@ func (s *Service) CreateKey(ctx context.Context, name string) (string, error) {
 		return "", ErrNoEndpoint
 	}
 
-	found, err := s.discover(ctx)
+	installedContainers, err := s.discover(ctx)
 	if err != nil {
 		return "", err
 	}
-	c, err := pick(found, name)
+	c, err := pick(installedContainers, name)
 	if err != nil {
 		return "", err
 	}
@@ -111,26 +110,16 @@ func (s *Service) discover(ctx context.Context) ([]container.Container, error) {
 	return found, nil
 }
 
-// pick returns the container with the given name, or the only container
-// when the name is empty.
-func pick(found []container.Container, name string) (container.Container, error) {
-	if name == "" {
-		switch len(found) {
-		case 0:
-			return container.Container{}, ErrNoProtocol
-		case 1:
-			return found[0], nil
-		}
-		names := make([]string, 0, len(found))
-		for _, c := range found {
-			names = append(names, c.Name)
-		}
-		return container.Container{}, fmt.Errorf("%w: %s", ErrManyProtocols, strings.Join(names, ", "))
+func pick(installedContainers []container.Container, name string) (container.Container, error) {
+
+	if len(installedContainers) == 0 {
+		return container.Container{}, ErrNoProtocol
 	}
 
-	i := slices.IndexFunc(found, func(c container.Container) bool { return c.Name == name })
-	if i < 0 {
-		return container.Container{}, fmt.Errorf("%w: %s", ErrNotFound, name)
+	for _, c := range installedContainers {
+		if c.Name == name {
+			return c, nil
+		}
 	}
-	return found[i], nil
+	return container.Container{}, fmt.Errorf("%w: %s", ErrNotFound, name)
 }

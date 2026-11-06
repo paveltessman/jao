@@ -23,7 +23,7 @@ func runList(ctx context.Context, cfg settings.Settings, args []string) error {
 	}
 	defer closeFn()
 
-	installed, err := keys.New(ctr, cfg.PublicHost).Discover(ctx)
+	installed, err := keys.NewService(ctr, cfg.PublicHost).Discover(ctx)
 	if err != nil {
 		return err
 	}

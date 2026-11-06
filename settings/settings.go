@@ -3,16 +3,21 @@ package settings
 
 import "os"
 
-const envWorkDir = "JAO_WORKING_DIR"
+const (
+	envWorkDir    = "JAO_WORKING_DIR"
+	envPublicHost = "JAO_PUBLIC_HOST" // public IP or domain of the node
+	envHttpAddr   = "JAO_HTTP_LISTEN_ADDR"
+)
 
-// envPublicHost holds the public IP or domain of the node.
-const envPublicHost = "JAO_PUBLIC_HOST"
-
-const defaultWorkDir = "/opt/jao"
+const (
+	defaultWorkDir  = "/opt/jao"
+	defaultHTTPAddr = "127.0.0.1:8001"
+)
 
 type Settings struct {
-	WorkDir    string
-	PublicHost string
+	WorkDir        string
+	PublicHost     string
+	HttpListenAddr string
 }
 
 func New() Settings {
@@ -22,9 +27,15 @@ func New() Settings {
 		workDir = defaultWorkDir
 	}
 
+	httpAddr := os.Getenv(envHttpAddr)
+	if httpAddr == "" {
+		httpAddr = defaultHTTPAddr
+	}
+
 	settings := Settings{
-		WorkDir:    workDir,
-		PublicHost: os.Getenv(envPublicHost),
+		WorkDir:        workDir,
+		PublicHost:     os.Getenv(envPublicHost),
+		HttpListenAddr: httpAddr,
 	}
 	return settings
 }

@@ -16,7 +16,7 @@ build: ## Build the app
 
 .PHONY: run
 run: ## Run the app on the host
-	go run ./...
+	go run ./... serve
 
 .PHONY: check-no-lint
 check-no-lint: ## Run checks without lint: tidy, vet, test - for CI

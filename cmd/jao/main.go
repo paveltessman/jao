@@ -21,8 +21,9 @@ type command struct {
 func commands() []command {
 	commands := []command{
 		{"install", "install the AWG container", runInstall},
-		{"key", "create a key in a protocol container and print its client config", runKey},
+		{"create", "create a key in a protocol container and print its client config", runCreate},
 		{"list", "list the protocol containers on the node", runList},
+		{"serve", "run the http server", runServe},
 	}
 	return commands
 }
@@ -60,6 +61,7 @@ func usage() {
 	for _, c := range commands() {
 		fmt.Fprintf(os.Stderr, "  %-8s %s\n", c.name, c.summary)
 	}
+	fmt.Fprintf(os.Stderr, "\n")
 }
 
 // newContainerService connects to the Docker engine and makes sure that it replies.

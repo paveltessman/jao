@@ -14,6 +14,8 @@ import (
 	"github.com/paveltessman/jao/protocol/awg"
 )
 
+var _ ServiceProto = (*Service)(nil)
+
 type ContainerAPI interface {
 	ContainerList(ctx context.Context, label string) ([]container.Container, error)
 	ContainerExec(ctx context.Context, id string, cmd []string) (string, error)
@@ -24,12 +26,6 @@ var _ ContainerAPI = (*container.Service)(nil)
 var ErrNoEndpoint = errors.New("keys: endpoint host is empty")
 var ErrNoProtocol = errors.New("keys: no protocol is installed")
 var ErrNotFound = errors.New("keys: protocol not found")
-
-// Installed describes a protocol container on the node.
-type Installed struct {
-	Name     string `json:"name"`
-	Protocol string `json:"proto"`
-}
 
 type Service struct {
 	ctr          ContainerAPI

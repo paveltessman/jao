@@ -15,8 +15,8 @@ func Route(deps shared.Deps) http.Handler {
 
 	svc := Service{deps}
 
-	mux.Handle("POST /containers/{name}/", Wrap(svc.createKey))
-	mux.Handle("GET /containers", Wrap(svc.listContainers))
+	mux.Handle("POST /containers/{name}/", wrap(svc.createKey))
+	mux.Handle("GET /containers", wrap(svc.listContainers))
 
 	return mux
 }

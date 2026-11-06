@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/paveltessman/jao/keys"
+	"github.com/paveltessman/jao/protocol/awg"
 )
 
 var ErrBadPathValue = errors.New("bad path value")
@@ -18,6 +19,7 @@ type ErrorSpec struct {
 var errorSpecs = map[error]ErrorSpec{
 	ErrBadPathValue:  {internal: false, statusCode: http.StatusBadRequest},
 	keys.ErrNotFound: {internal: false, statusCode: http.StatusBadRequest},
+	awg.ErrBadEnv:    {internal: true, statusCode: http.StatusInternalServerError},
 }
 
 func errorSpec(err error) (ErrorSpec, bool) {

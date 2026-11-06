@@ -3,7 +3,7 @@ package shared
 import "github.com/paveltessman/jao/keys"
 
 type Deps struct {
-	KeyService *keys.Service
+	KeyService keys.ServiceProto
 }
 
 func NewDeps(keyService *keys.Service) Deps {

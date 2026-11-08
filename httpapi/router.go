@@ -5,12 +5,14 @@ import (
 
 	"github.com/paveltessman/jao/httpapi/api"
 	"github.com/paveltessman/jao/httpapi/shared"
+	"github.com/paveltessman/jao/httpapi/ui"
 )
 
 func mainRoute(deps shared.Deps) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", api.Route(deps)))
+	mux.Handle("/ui/", http.StripPrefix("/ui", ui.Route()))
 
 	return mux
 }

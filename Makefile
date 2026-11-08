@@ -17,7 +17,7 @@ build-nextjs: ## Create nextjs export
 
 .PHONY: build
 build: build-nextjs ## Build the app
-	go build -o $(BIN) ./...
+	go build -o $(BIN)/jao ./cmd/jao
 
 .PHONY: run
 run: ## Run the app on the host

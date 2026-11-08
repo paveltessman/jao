@@ -25,6 +25,7 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
+      - run: make build
       - run: make check-no-lint
 
       - name: golangci-lint
@@ -44,4 +45,5 @@ jobs:
           cache-dependency-path: go.sum
 
       # The GitHub-hosted runner has a Docker daemon.
+      - run: make build
       - run: make test-integration

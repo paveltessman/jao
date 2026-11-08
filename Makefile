@@ -10,9 +10,14 @@ help: ## List available targets
 
 ## ---------------------------------------------------------------- build & run
 
+.PHONY: build-nextjs
+build-nextjs: ## Create nextjs export
+	npm install --prefix frontend; \
+	NEXT_TELEMETRY_DISABLED=1 npm run build --prefix frontend
+
 .PHONY: build
-build: ## Build the app
-	go build -o $(BIN)/jao ./...
+build: build-nextjs ## Build the app
+	go build -o $(BIN) ./...
 
 .PHONY: run
 run: ## Run the app on the host

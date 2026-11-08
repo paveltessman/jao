@@ -7,6 +7,9 @@ linters:
   settings:
     exhaustive:
       default-signifies-exhaustive: false
+  exclusions:
+    paths:
+      - ^frontend/node_modules/
 
 formatters:
   enable:

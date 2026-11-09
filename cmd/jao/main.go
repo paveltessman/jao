@@ -24,6 +24,7 @@ func commands() []command {
 		{"create", "create a key in a protocol container and print its client config", runCreate},
 		{"list", "list the protocol containers on the node", runList},
 		{"serve", "run the http server", runServe},
+		{"migrate", "run db migrations", runMigrate},
 	}
 	return commands
 }

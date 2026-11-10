@@ -9,6 +9,7 @@ tool (
 )
 
 require (
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/moby/moby/api v1.56.1
 	github.com/moby/moby/client v0.6.2
 	github.com/pressly/goose/v3 v3.29.0

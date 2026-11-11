@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 	"uuid"
 
@@ -24,6 +25,28 @@ func New(db *sql.DB) *Repo {
 	return r
 }
 
+func (r *Repo) Insert(ctx context.Context, user users.User) error {
+
+	now := time.Now()
+	args := sqlc.UserInsertParams{
+		ID:             user.ID.String(),
+		Name:           user.Name,
+		Lastseen:       user.LastSeen,
+		Active:         user.Active,
+		Passhash:       user.PassHash,
+		RefreshTokenID: user.RefreshTokenID,
+		UpdatedAt:      now,
+		CreatedAt:      now,
+	}
+
+	err := r.queries.UserInsert(ctx, args)
+	if err != nil {
+		return fmt.Errorf("%w: %w", dbtools.ErrDb, err)
+	}
+
+	return nil
+}
+
 func (r *Repo) Get(ctx context.Context, id uuid.UUID) (users.User, error) {
 
 	u, err := r.queries.UserGetByID(ctx, id.String())
@@ -37,12 +60,15 @@ func (r *Repo) Get(ctx context.Context, id uuid.UUID) (users.User, error) {
 func (r *Repo) Update(ctx context.Context, user users.User) error {
 
 	args := sqlc.UserUpdateParams{
-		Lastseen:       user.LastSeen.Unix(),
+		Lastseen:       user.LastSeen,
 		Active:         user.Active,
 		Passhash:       user.PassHash,
 		RefreshTokenID: user.RefreshTokenID,
-		UpdatedAt:      time.Now().Unix(),
+		UpdatedAt:      time.Now(),
+		ID:             user.ID.String(),
 	}
+
+	log.Println(args.Active)
 
 	err := r.queries.UserUpdate(ctx, args)
 	if err != nil {
@@ -61,7 +87,7 @@ func sqlcToUser(u sqlc.AppUser) (users.User, error) {
 	user := users.User{
 		ID:             id,
 		Name:           u.Name,
-		LastSeen:       dbtools.Int64ToUnixTime(u.Lastseen),
+		LastSeen:       u.Lastseen,
 		Active:         u.Active,
 		PassHash:       u.Passhash,
 		RefreshTokenID: u.RefreshTokenID,

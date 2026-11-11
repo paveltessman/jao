@@ -3,8 +3,6 @@ package migrations
 import (
 	"io/fs"
 	"testing"
-
-	_ "modernc.org/sqlite"
 )
 
 func countMigrations(t *testing.T) int {

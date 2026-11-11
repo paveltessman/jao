@@ -24,3 +24,7 @@ SET
     updated_at = ?
 WHERE
     id = ?;
+
+-- name: UserInsert :exec
+INSERT INTO app_user (id, name, lastseen, active, passhash, refresh_token_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?);

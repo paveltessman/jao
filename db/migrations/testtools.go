@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"os"
 	"testing"
+
+	_ "modernc.org/sqlite"
 )
 
 const dbFile = "testdb.sqlite"

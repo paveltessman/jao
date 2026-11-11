@@ -6,6 +6,9 @@ on:
       - "docs/**"
       - "**.md"
 
+env:
+  JAO_SECRET_KEY: "opa"
+
 concurrency:
   group: go-${{ github.ref }}
   cancel-in-progress: true

@@ -25,6 +25,7 @@ func commands() []command {
 		{"list", "list the protocol containers on the node", runList},
 		{"serve", "run the http server", runServe},
 		{"migrate", "run db migrations", runMigrate},
+		{"users", "manage users", runUsers},
 	}
 	return commands
 }

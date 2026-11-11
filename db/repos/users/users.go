@@ -15,6 +15,7 @@ import (
 )
 
 var _ auth.UsersRepo = (*Repo)(nil)
+var _ users.UsersRepo = (*Repo)(nil)
 
 type Repo struct {
 	queries *sqlc.Queries

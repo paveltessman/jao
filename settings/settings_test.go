@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -24,6 +25,7 @@ func TestNew(t *testing.T) {
 		envWorkDir:    workDir,
 		envPublicHost: publicHost,
 		envHttpAddr:   httpAddr,
+		envSecretKey:  "opa",
 	})
 
 	if settings.WorkDir != workDir {
@@ -42,8 +44,7 @@ func TestNew(t *testing.T) {
 
 func TestNewSetsDefaults(t *testing.T) {
 
-	// Empty values, so that the env of the shell does not change the result.
-	settings := load(t, map[string]string{envWorkDir: "", envPublicHost: ""})
+	settings := load(t, map[string]string{envWorkDir: "", envPublicHost: "", envSecretKey: "opa"})
 
 	if settings.WorkDir != defaultWorkDir {
 		t.Logf("want default walue for workdir, got %s", settings.WorkDir)
@@ -57,5 +58,26 @@ func TestNewSetsDefaults(t *testing.T) {
 	if settings.HttpListenAddr != "127.0.0.1:8001" {
 		t.Errorf("wrong default http listen address: got %s", settings.HttpListenAddr)
 	}
+
+}
+
+func TestNewPanicsWithEmptySecret(t *testing.T) {
+
+	defer func() {
+		v := recover()
+
+		if v == nil {
+			t.Errorf("want panic, got nil")
+		}
+
+		err := v.(error)
+
+		if !errors.Is(err, ErrSecretNotSet) {
+			t.Errorf("want the secret key error, got %q", err)
+		}
+
+	}()
+
+	_ = load(t, map[string]string{envSecretKey: ""})
 
 }

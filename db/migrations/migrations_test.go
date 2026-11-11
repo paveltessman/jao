@@ -1,15 +1,9 @@
 package migrations
 
 import (
-	"database/sql"
 	"io/fs"
-	"os"
 	"testing"
-
-	_ "modernc.org/sqlite"
 )
-
-const dbFile = "testdb.sqlite"
 
 func countMigrations(t *testing.T) int {
 	t.Helper()
@@ -26,40 +20,9 @@ func countMigrations(t *testing.T) int {
 
 }
 
-func removeDBFile(t *testing.T) {
-	t.Helper()
-	err := os.Remove(dbFile)
-	if os.IsNotExist(err) {
-		return
-	}
-	if err != nil {
-		t.Fatalf("can't remove database file after test: %v", err)
-	}
-}
-
-func db(t *testing.T) (*sql.DB, error) {
-	t.Helper()
-
-	removeDBFile(t)
-
-	db, err := sql.Open("sqlite", dbFile)
-	if err != nil {
-		return nil, err
-	}
-
-	return db, nil
-}
-
 func TestUpAndDown(t *testing.T) {
 
-	db, err := db(t)
-	if err != nil {
-		t.Fatalf("can't create database: %v", err)
-	}
-
-	t.Cleanup(func() {
-		removeDBFile(t)
-	})
+	db := DBForTests(t)
 
 	migrationsCount := countMigrations(t)
 

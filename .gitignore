@@ -1,3 +1,4 @@
 .setenv
 *.sqlite
 bin
+*_sqlc.go

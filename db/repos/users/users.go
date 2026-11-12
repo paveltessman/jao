@@ -48,7 +48,7 @@ func (r *Repo) Insert(ctx context.Context, user users.User) error {
 	return nil
 }
 
-func (r *Repo) Get(ctx context.Context, id uuid.UUID) (users.User, error) {
+func (r *Repo) SelectByID(ctx context.Context, id uuid.UUID) (users.User, error) {
 
 	u, err := r.queries.UserGetByID(ctx, id.String())
 	if err != nil {

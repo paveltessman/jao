@@ -12,11 +12,22 @@ import (
 	"github.com/paveltessman/jao/users"
 )
 
+var _ UsersRepo = (*fakeUsersRepo)(nil)
+
 type fakeUsersRepo struct {
-	onGetUser      users.User
-	onGetUserErr   error
-	onUpdateErr    error
-	updateCallArgs []users.User
+	onSelectUser    users.User
+	errOnSelectUser error
+	onUpdateErr     error
+	updateCallArgs  []users.User
+}
+
+func (r *fakeUsersRepo) SelectByID(ctx context.Context, ID uuid.UUID) (users.User, error) {
+	return r.onSelectUser, r.errOnSelectUser
+}
+
+func (r *fakeUsersRepo) Update(ctx context.Context, user users.User) error {
+	r.updateCallArgs = append(r.updateCallArgs, user)
+	return r.onUpdateErr
 }
 
 func userIDFromTokenString(t *testing.T, tokenString string, svc *Service) string {
@@ -86,21 +97,12 @@ func newUser() users.User {
 	return u
 }
 
-func (r *fakeUsersRepo) Get(ctx context.Context, ID uuid.UUID) (users.User, error) {
-	return r.onGetUser, r.onGetUserErr
-}
-
-func (r *fakeUsersRepo) Update(ctx context.Context, user users.User) error {
-	r.updateCallArgs = append(r.updateCallArgs, user)
-	return r.onUpdateErr
-}
-
 func TestAuthenticateWithValidToken(t *testing.T) {
 
 	expectedUser := newUser()
 	expectedUser.Active = true
 	usersRepo := &fakeUsersRepo{
-		onGetUser: expectedUser,
+		onSelectUser: expectedUser,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -121,7 +123,7 @@ func TestAuthenticateWithExpiredToken(t *testing.T) {
 	expectedUser := newUser()
 	expectedUser.Active = true
 	usersRepo := &fakeUsersRepo{
-		onGetUser: expectedUser,
+		onSelectUser: expectedUser,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -136,7 +138,7 @@ func TestAuthenticateWithInvalidToken(t *testing.T) {
 	expectedUser := newUser()
 	expectedUser.Active = true
 	usersRepo := &fakeUsersRepo{
-		onGetUser: expectedUser,
+		onSelectUser: expectedUser,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -151,7 +153,7 @@ func TestAuthenticateWithDeactivatedUser(t *testing.T) {
 	expectedUser := newUser()
 	expectedUser.Active = false
 	usersRepo := &fakeUsersRepo{
-		onGetUser: expectedUser,
+		onSelectUser: expectedUser,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -166,8 +168,8 @@ func TestAuthenticateWithWithNonexistentUser(t *testing.T) {
 	dbError := errors.New("opa x2")
 
 	usersRepo := &fakeUsersRepo{
-		onGetUser:    users.User{},
-		onGetUserErr: dbError,
+		onSelectUser:    users.User{},
+		errOnSelectUser: dbError,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -183,7 +185,7 @@ func TestAuthenticateUpdatesLastSeen(t *testing.T) {
 	expectedUser.Active = true
 	expectedUser.LastSeen = time.Now()
 	usersRepo := &fakeUsersRepo{
-		onGetUser: expectedUser,
+		onSelectUser: expectedUser,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -213,8 +215,8 @@ func TestAuthenticateHandlesErrorOnLastSeenUpdate(t *testing.T) {
 	expectedUser.Active = true
 	expectedUser.LastSeen = time.Now()
 	usersRepo := &fakeUsersRepo{
-		onGetUser:   expectedUser,
-		onUpdateErr: dbError,
+		onSelectUser: expectedUser,
+		onUpdateErr:  dbError,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -231,7 +233,7 @@ func TestRefreshWithValidToken(t *testing.T) {
 	user.Active = true
 	user.RefreshTokenID = refreshTokenID.String()
 	usersRepo := &fakeUsersRepo{
-		onGetUser: user,
+		onSelectUser: user,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -245,7 +247,7 @@ func TestRefreshWithExpiredToken(t *testing.T) {
 
 	user := newUser()
 	usersRepo := &fakeUsersRepo{
-		onGetUser: user,
+		onSelectUser: user,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -262,7 +264,7 @@ func TestRefreshWithInvalidToken(t *testing.T) {
 	user.Active = false
 	user.RefreshTokenID = refreshTokenID.String()
 	usersRepo := &fakeUsersRepo{
-		onGetUser: user,
+		onSelectUser: user,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -279,7 +281,7 @@ func TestRefreshWithDeactivatedUser(t *testing.T) {
 	user.Active = false
 	user.RefreshTokenID = refreshTokenID.String()
 	usersRepo := &fakeUsersRepo{
-		onGetUser: user,
+		onSelectUser: user,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -294,8 +296,8 @@ func TestRefreshWithNonExistentUser(t *testing.T) {
 	dbError := errors.New("opa x2")
 
 	usersRepo := &fakeUsersRepo{
-		onGetUser:    users.User{},
-		onGetUserErr: dbError,
+		onSelectUser:    users.User{},
+		errOnSelectUser: dbError,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -312,7 +314,7 @@ func TestRefreshSetsUserID(t *testing.T) {
 	user.Active = true
 	user.RefreshTokenID = refreshTokenID.String()
 	usersRepo := &fakeUsersRepo{
-		onGetUser: user,
+		onSelectUser: user,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -337,7 +339,7 @@ func TestRefreshSetsTokenDuration(t *testing.T) {
 	user.Active = true
 	user.RefreshTokenID = refreshTokenID.String()
 	usersRepo := &fakeUsersRepo{
-		onGetUser: user,
+		onSelectUser: user,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -361,7 +363,7 @@ func TestRefreshWithIncorrectTokenID(t *testing.T) {
 	user.Active = false
 	user.RefreshTokenID = refreshTokenID.String()
 	usersRepo := &fakeUsersRepo{
-		onGetUser: user,
+		onSelectUser: user,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -375,7 +377,7 @@ func TestUserFromTokenWithValidToken(t *testing.T) {
 
 	expectedUser := newUser()
 	usersRepo := &fakeUsersRepo{
-		onGetUser: expectedUser,
+		onSelectUser: expectedUser,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -398,8 +400,8 @@ func TestUserFromTokenWithDbError(t *testing.T) {
 
 	expectedUser := newUser()
 	usersRepo := &fakeUsersRepo{
-		onGetUser:    users.User{},
-		onGetUserErr: dbError,
+		onSelectUser:    users.User{},
+		errOnSelectUser: dbError,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -415,7 +417,7 @@ func TestUserFromTokenWithDbError(t *testing.T) {
 func TestUserFromTokenWithInvalidToken(t *testing.T) {
 
 	usersRepo := &fakeUsersRepo{
-		onGetUser: users.User{},
+		onSelectUser: users.User{},
 	}
 	svc := NewService(usersRepo, "opa")
 

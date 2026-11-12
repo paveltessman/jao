@@ -22,7 +22,7 @@ const (
 )
 
 type UsersRepo interface {
-	Get(ctx context.Context, ID uuid.UUID) (users.User, error)
+	SelectByID(ctx context.Context, ID uuid.UUID) (users.User, error)
 	Update(ctx context.Context, user users.User) error
 }
 
@@ -110,7 +110,7 @@ func (s *Service) userFromToken(ctx context.Context, tokenString string) (users.
 		return users.User{}, claims{}, fmt.Errorf("unable to parse user id from refresh token: %w", err)
 	}
 
-	user, err := s.users.Get(ctx, userID)
+	user, err := s.users.SelectByID(ctx, userID)
 	if err != nil {
 		return users.User{}, claims{}, err
 	}

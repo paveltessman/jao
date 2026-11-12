@@ -29,7 +29,7 @@ func insert(t *testing.T, repo *Repo, user users.User) {
 func selectByID(t *testing.T, repo *Repo, id uuid.UUID) users.User {
 	t.Helper()
 
-	user, err := repo.Get(t.Context(), id)
+	user, err := repo.SelectByID(t.Context(), id)
 	if err != nil {
 		t.Fatalf("error when selecting user: %v", err)
 	}
@@ -37,7 +37,7 @@ func selectByID(t *testing.T, repo *Repo, id uuid.UUID) users.User {
 	return user
 }
 
-func TestInsertGet(t *testing.T) {
+func TestInsertSelect(t *testing.T) {
 
 	repo := New(migrations.DBForTestsWithMigrations(t))
 

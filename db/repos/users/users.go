@@ -3,13 +3,14 @@ package users
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"time"
 	"uuid"
 
 	"github.com/paveltessman/jao/auth"
-	"github.com/paveltessman/jao/db/internal/dbtools"
+	"github.com/paveltessman/jao/db/dbtools"
 	"github.com/paveltessman/jao/db/internal/sqlc"
 	"github.com/paveltessman/jao/users"
 )
@@ -48,11 +49,21 @@ func (r *Repo) Insert(ctx context.Context, user users.User) error {
 	return nil
 }
 
-func (r *Repo) Get(ctx context.Context, id uuid.UUID) (users.User, error) {
+func (r *Repo) SelectByID(ctx context.Context, id uuid.UUID) (users.User, error) {
 
-	u, err := r.queries.UserGetByID(ctx, id.String())
+	u, err := r.queries.UserSelectByID(ctx, id.String())
 	if err != nil {
-		return users.User{}, fmt.Errorf("%w: %w", dbtools.ErrDb, err)
+		return users.User{}, wrapError(err)
+	}
+
+	return sqlcToUser(u)
+}
+
+func (r *Repo) SelectByName(ctx context.Context, name string) (users.User, error) {
+
+	u, err := r.queries.UserSelectByName(ctx, name)
+	if err != nil {
+		return users.User{}, wrapError(err)
 	}
 
 	return sqlcToUser(u)
@@ -95,4 +106,12 @@ func sqlcToUser(u sqlc.AppUser) (users.User, error) {
 	}
 
 	return user, nil
+}
+
+func wrapError(err error) error {
+	parentErr := dbtools.ErrDb
+	if errors.Is(err, sql.ErrNoRows) {
+		parentErr = dbtools.ErrNoRows
+	}
+	return fmt.Errorf("%w: %w", parentErr, err)
 }

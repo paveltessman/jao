@@ -1,4 +1,4 @@
--- name: UserGetByID :one
+-- name: UserSelectByID :one
 SELECT
     id,
     name,
@@ -12,6 +12,21 @@ FROM
     app_user
 WHERE
     id = ?;
+
+-- name: UserSelectByName :one
+SELECT
+    id,
+    name,
+    lastseen,
+    active,
+    passhash,
+    refresh_token_id,
+    created_at,
+    updated_at
+FROM
+    app_user
+WHERE
+    name = ?;
 
 -- name: UserUpdate :exec
 UPDATE

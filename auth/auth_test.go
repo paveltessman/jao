@@ -9,14 +9,41 @@ import (
 	"uuid"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/paveltessman/jao/password"
 	"github.com/paveltessman/jao/users"
 )
 
+var _ UsersRepo = (*fakeUsersRepo)(nil)
+
 type fakeUsersRepo struct {
-	onGetUser      users.User
-	onGetUserErr   error
-	onUpdateErr    error
-	updateCallArgs []users.User
+	onSelectUser    users.User
+	errOnSelectUser error
+	onUpdateErr     error
+	updateCallArgs  []users.User
+}
+
+func (r *fakeUsersRepo) SelectByID(ctx context.Context, ID uuid.UUID) (users.User, error) {
+	return r.onSelectUser, r.errOnSelectUser
+}
+
+func (r *fakeUsersRepo) SelectByName(ctx context.Context, name string) (users.User, error) {
+	return r.onSelectUser, r.errOnSelectUser
+}
+
+func (r *fakeUsersRepo) Update(ctx context.Context, user users.User) error {
+	r.updateCallArgs = append(r.updateCallArgs, user)
+	return r.onUpdateErr
+}
+
+func setPasswdHash(t *testing.T, user *users.User, passwd string) {
+	t.Helper()
+
+	passwdHash, err := password.Hash(passwd)
+	if err != nil {
+		t.Fatalf("unable to create password hash: %v", err)
+	}
+
+	user.PassHash = passwdHash
 }
 
 func userIDFromTokenString(t *testing.T, tokenString string, svc *Service) string {
@@ -86,21 +113,12 @@ func newUser() users.User {
 	return u
 }
 
-func (r *fakeUsersRepo) Get(ctx context.Context, ID uuid.UUID) (users.User, error) {
-	return r.onGetUser, r.onGetUserErr
-}
-
-func (r *fakeUsersRepo) Update(ctx context.Context, user users.User) error {
-	r.updateCallArgs = append(r.updateCallArgs, user)
-	return r.onUpdateErr
-}
-
 func TestAuthenticateWithValidToken(t *testing.T) {
 
 	expectedUser := newUser()
 	expectedUser.Active = true
 	usersRepo := &fakeUsersRepo{
-		onGetUser: expectedUser,
+		onSelectUser: expectedUser,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -121,12 +139,12 @@ func TestAuthenticateWithExpiredToken(t *testing.T) {
 	expectedUser := newUser()
 	expectedUser.Active = true
 	usersRepo := &fakeUsersRepo{
-		onGetUser: expectedUser,
+		onSelectUser: expectedUser,
 	}
 	svc := NewService(usersRepo, "opa")
 
 	_, err := svc.Authenticate(t.Context(), expiredTokenForUser(t, svc, expectedUser.ID, uuid.New()))
-	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "expired") {
+	if !errors.Is(err, ErrNotAuthenticated) && !strings.Contains(err.Error(), "expired") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
 }
@@ -136,12 +154,12 @@ func TestAuthenticateWithInvalidToken(t *testing.T) {
 	expectedUser := newUser()
 	expectedUser.Active = true
 	usersRepo := &fakeUsersRepo{
-		onGetUser: expectedUser,
+		onSelectUser: expectedUser,
 	}
 	svc := NewService(usersRepo, "opa")
 
 	_, err := svc.Authenticate(t.Context(), "opa opa")
-	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "malformed") {
+	if !errors.Is(err, ErrNotAuthenticated) && !strings.Contains(err.Error(), "malformed") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
 }
@@ -151,12 +169,12 @@ func TestAuthenticateWithDeactivatedUser(t *testing.T) {
 	expectedUser := newUser()
 	expectedUser.Active = false
 	usersRepo := &fakeUsersRepo{
-		onGetUser: expectedUser,
+		onSelectUser: expectedUser,
 	}
 	svc := NewService(usersRepo, "opa")
 
 	_, err := svc.Authenticate(t.Context(), validTokenForUser(t, svc, expectedUser.ID, uuid.New()))
-	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "deactivated") {
+	if !errors.Is(err, ErrNotAuthenticated) && !strings.Contains(err.Error(), "deactivated") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
 }
@@ -166,13 +184,13 @@ func TestAuthenticateWithWithNonexistentUser(t *testing.T) {
 	dbError := errors.New("opa x2")
 
 	usersRepo := &fakeUsersRepo{
-		onGetUser:    users.User{},
-		onGetUserErr: dbError,
+		onSelectUser:    users.User{},
+		errOnSelectUser: dbError,
 	}
 	svc := NewService(usersRepo, "opa")
 
 	_, err := svc.Authenticate(t.Context(), validTokenForUser(t, svc, uuid.New(), uuid.New()))
-	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "opa x2") {
+	if !errors.Is(err, ErrNotAuthenticated) && !strings.Contains(err.Error(), "opa x2") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
 }
@@ -183,7 +201,7 @@ func TestAuthenticateUpdatesLastSeen(t *testing.T) {
 	expectedUser.Active = true
 	expectedUser.LastSeen = time.Now()
 	usersRepo := &fakeUsersRepo{
-		onGetUser: expectedUser,
+		onSelectUser: expectedUser,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -213,15 +231,107 @@ func TestAuthenticateHandlesErrorOnLastSeenUpdate(t *testing.T) {
 	expectedUser.Active = true
 	expectedUser.LastSeen = time.Now()
 	usersRepo := &fakeUsersRepo{
-		onGetUser:   expectedUser,
-		onUpdateErr: dbError,
+		onSelectUser: expectedUser,
+		onUpdateErr:  dbError,
 	}
 	svc := NewService(usersRepo, "opa")
 
 	_, err := svc.Authenticate(t.Context(), validTokenForUser(t, svc, expectedUser.ID, uuid.New()))
-	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "fuk") {
+	if !errors.Is(err, ErrNotAuthenticated) && !strings.Contains(err.Error(), "fuk") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
+}
+
+func TestLoginWithValidPassword(t *testing.T) {
+
+	user := newUser()
+	user.Active = true
+	setPasswdHash(t, &user, "password")
+
+	usersRepo := &fakeUsersRepo{
+		onSelectUser: user,
+	}
+	svc := NewService(usersRepo, "opa")
+
+	loadedUser, _, err := svc.Login(t.Context(), "username", "password")
+	if err != nil {
+		t.Fatalf("unable to log in: %v", err)
+	}
+
+	if loadedUser != user {
+		t.Fatalf("users don't match")
+	}
+
+}
+
+func TestLoginWithInvalidPassword(t *testing.T) {
+
+	user := newUser()
+	user.Active = true
+	setPasswdHash(t, &user, "password")
+
+	usersRepo := &fakeUsersRepo{
+		onSelectUser: user,
+	}
+	svc := NewService(usersRepo, "opa")
+
+	loadedUser, _, err := svc.Login(t.Context(), "username", "password2")
+	if !errors.Is(err, ErrNotAuthenticated) {
+		t.Fatalf("expected auth err, got something else: %v", err)
+	}
+
+	if loadedUser == user {
+		t.Fatalf("users must not match")
+	}
+
+}
+
+func TestLoginWithInactiveUser(t *testing.T) {
+
+	user := newUser()
+	user.Active = false
+	setPasswdHash(t, &user, "password")
+
+	usersRepo := &fakeUsersRepo{
+		onSelectUser: user,
+	}
+	svc := NewService(usersRepo, "opa")
+
+	loadedUser, _, err := svc.Login(t.Context(), "username", "password")
+	if !errors.Is(err, ErrNotAuthenticated) {
+		t.Fatalf("expected auth err, got something else: %v", err)
+	}
+
+	if loadedUser == user {
+		t.Fatalf("users must not match")
+	}
+
+}
+
+func TestLoginGivesCorrectTokens(t *testing.T) {
+
+	user := newUser()
+	user.Active = true
+	setPasswdHash(t, &user, "password")
+
+	usersRepo := &fakeUsersRepo{
+		onSelectUser: user,
+	}
+	svc := NewService(usersRepo, "opa")
+
+	_, tokens, err := svc.Login(t.Context(), "username", "password")
+	if err != nil {
+		t.Fatalf("unable to log in: %v", err)
+	}
+
+	if !tokenContainsUserID(t, svc, tokens.Access, user.ID) {
+		t.Errorf("access token has incorrect user id: got=%q, want=%q", tokens.Access, user.ID)
+	}
+
+	if !tokenContainsUserID(t, svc, tokens.Refresh, user.ID) {
+		t.Errorf("refresh token has incorrect user id: got=%q, want=%q", tokens.Access, user.ID)
+	}
+
 }
 
 func TestRefreshWithValidToken(t *testing.T) {
@@ -231,7 +341,7 @@ func TestRefreshWithValidToken(t *testing.T) {
 	user.Active = true
 	user.RefreshTokenID = refreshTokenID.String()
 	usersRepo := &fakeUsersRepo{
-		onGetUser: user,
+		onSelectUser: user,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -245,12 +355,12 @@ func TestRefreshWithExpiredToken(t *testing.T) {
 
 	user := newUser()
 	usersRepo := &fakeUsersRepo{
-		onGetUser: user,
+		onSelectUser: user,
 	}
 	svc := NewService(usersRepo, "opa")
 
 	_, err := svc.Refresh(t.Context(), expiredTokenForUser(t, svc, user.ID, uuid.New()))
-	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "expired") {
+	if !errors.Is(err, ErrNotAuthenticated) && !strings.Contains(err.Error(), "expired") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
 }
@@ -262,12 +372,12 @@ func TestRefreshWithInvalidToken(t *testing.T) {
 	user.Active = false
 	user.RefreshTokenID = refreshTokenID.String()
 	usersRepo := &fakeUsersRepo{
-		onGetUser: user,
+		onSelectUser: user,
 	}
 	svc := NewService(usersRepo, "opa")
 
 	_, err := svc.Refresh(t.Context(), "opa opa")
-	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "malformed") {
+	if !errors.Is(err, ErrNotAuthenticated) && !strings.Contains(err.Error(), "malformed") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
 }
@@ -279,12 +389,12 @@ func TestRefreshWithDeactivatedUser(t *testing.T) {
 	user.Active = false
 	user.RefreshTokenID = refreshTokenID.String()
 	usersRepo := &fakeUsersRepo{
-		onGetUser: user,
+		onSelectUser: user,
 	}
 	svc := NewService(usersRepo, "opa")
 
 	_, err := svc.Refresh(t.Context(), validTokenForUser(t, svc, user.ID, refreshTokenID))
-	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "deactivated") {
+	if !errors.Is(err, ErrNotAuthenticated) && !strings.Contains(err.Error(), "deactivated") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
 }
@@ -294,13 +404,13 @@ func TestRefreshWithNonExistentUser(t *testing.T) {
 	dbError := errors.New("opa x2")
 
 	usersRepo := &fakeUsersRepo{
-		onGetUser:    users.User{},
-		onGetUserErr: dbError,
+		onSelectUser:    users.User{},
+		errOnSelectUser: dbError,
 	}
 	svc := NewService(usersRepo, "opa")
 
 	_, err := svc.Refresh(t.Context(), validTokenForUser(t, svc, uuid.New(), uuid.New()))
-	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "opa x2") {
+	if !errors.Is(err, ErrNotAuthenticated) && !strings.Contains(err.Error(), "opa x2") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
 }
@@ -312,7 +422,7 @@ func TestRefreshSetsUserID(t *testing.T) {
 	user.Active = true
 	user.RefreshTokenID = refreshTokenID.String()
 	usersRepo := &fakeUsersRepo{
-		onGetUser: user,
+		onSelectUser: user,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -337,7 +447,7 @@ func TestRefreshSetsTokenDuration(t *testing.T) {
 	user.Active = true
 	user.RefreshTokenID = refreshTokenID.String()
 	usersRepo := &fakeUsersRepo{
-		onGetUser: user,
+		onSelectUser: user,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -361,12 +471,12 @@ func TestRefreshWithIncorrectTokenID(t *testing.T) {
 	user.Active = false
 	user.RefreshTokenID = refreshTokenID.String()
 	usersRepo := &fakeUsersRepo{
-		onGetUser: user,
+		onSelectUser: user,
 	}
 	svc := NewService(usersRepo, "opa")
 
 	_, err := svc.Refresh(t.Context(), validTokenForUser(t, svc, user.ID, uuid.New()))
-	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "jti") {
+	if !errors.Is(err, ErrNotAuthenticated) && !strings.Contains(err.Error(), "jti") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
 }
@@ -375,7 +485,7 @@ func TestUserFromTokenWithValidToken(t *testing.T) {
 
 	expectedUser := newUser()
 	usersRepo := &fakeUsersRepo{
-		onGetUser: expectedUser,
+		onSelectUser: expectedUser,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -398,8 +508,8 @@ func TestUserFromTokenWithDbError(t *testing.T) {
 
 	expectedUser := newUser()
 	usersRepo := &fakeUsersRepo{
-		onGetUser:    users.User{},
-		onGetUserErr: dbError,
+		onSelectUser:    users.User{},
+		errOnSelectUser: dbError,
 	}
 	svc := NewService(usersRepo, "opa")
 
@@ -415,7 +525,7 @@ func TestUserFromTokenWithDbError(t *testing.T) {
 func TestUserFromTokenWithInvalidToken(t *testing.T) {
 
 	usersRepo := &fakeUsersRepo{
-		onGetUser: users.User{},
+		onSelectUser: users.User{},
 	}
 	svc := NewService(usersRepo, "opa")
 

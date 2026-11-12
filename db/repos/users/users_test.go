@@ -1,9 +1,11 @@
 package users
 
 import (
+	"errors"
 	"testing"
 	"uuid"
 
+	"github.com/paveltessman/jao/db/dbtools"
 	"github.com/paveltessman/jao/db/migrations"
 	"github.com/paveltessman/jao/users"
 )
@@ -29,7 +31,7 @@ func insert(t *testing.T, repo *Repo, user users.User) {
 func selectByID(t *testing.T, repo *Repo, id uuid.UUID) users.User {
 	t.Helper()
 
-	user, err := repo.Get(t.Context(), id)
+	user, err := repo.SelectByID(t.Context(), id)
 	if err != nil {
 		t.Fatalf("error when selecting user: %v", err)
 	}
@@ -37,7 +39,7 @@ func selectByID(t *testing.T, repo *Repo, id uuid.UUID) users.User {
 	return user
 }
 
-func TestInsertGet(t *testing.T) {
+func TestInsertSelectByID(t *testing.T) {
 
 	repo := New(migrations.DBForTestsWithMigrations(t))
 
@@ -46,6 +48,40 @@ func TestInsertGet(t *testing.T) {
 	insert(t, repo, insertedUser)
 
 	loadedUser := selectByID(t, repo, insertedUser.ID)
+
+	if loadedUser != insertedUser {
+		t.Errorf("inserted and loaded users do not match: loaded=%v, inserted=%v", loadedUser, insertedUser)
+	}
+}
+
+func TestSelectWithNoRows(t *testing.T) {
+
+	repo := New(migrations.DBForTestsWithMigrations(t))
+
+	_, err := repo.SelectByName(t.Context(), "opa")
+	if !errors.Is(err, dbtools.ErrNoRows) {
+		t.Errorf("expected no rows error, go something else: %v", err)
+	}
+
+	_, err = repo.SelectByID(t.Context(), uuid.New())
+	if !errors.Is(err, dbtools.ErrNoRows) {
+		t.Errorf("expected no rows error, go something else: %v", err)
+	}
+
+}
+
+func TestInsertSelectByName(t *testing.T) {
+
+	repo := New(migrations.DBForTestsWithMigrations(t))
+
+	insertedUser := newUser()
+
+	insert(t, repo, insertedUser)
+
+	loadedUser, err := repo.SelectByName(t.Context(), insertedUser.Name)
+	if err != nil {
+		t.Fatalf("error when selecting user by name: %v", err)
+	}
 
 	if loadedUser != insertedUser {
 		t.Errorf("inserted and loaded users do not match: loaded=%v, inserted=%v", loadedUser, insertedUser)

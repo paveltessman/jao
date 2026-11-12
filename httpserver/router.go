@@ -1,13 +1,13 @@
-package httpapi
+package httpserver
 
 import (
 	"net/http"
 
-	"github.com/paveltessman/jao/httpapi/api"
-	"github.com/paveltessman/jao/httpapi/auth"
-	"github.com/paveltessman/jao/httpapi/middleware"
-	"github.com/paveltessman/jao/httpapi/shared"
-	"github.com/paveltessman/jao/httpapi/ui"
+	"github.com/paveltessman/jao/httpserver/api"
+	"github.com/paveltessman/jao/httpserver/auth"
+	"github.com/paveltessman/jao/httpserver/middleware"
+	"github.com/paveltessman/jao/httpserver/shared"
+	"github.com/paveltessman/jao/httpserver/ui"
 )
 
 func mainRoute(deps shared.Deps) http.Handler {

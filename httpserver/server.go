@@ -1,4 +1,4 @@
-package httpapi
+package httpserver
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/paveltessman/jao/httpapi/shared"
+	"github.com/paveltessman/jao/httpserver/shared"
 	"github.com/paveltessman/jao/settings"
 )
 
@@ -33,7 +33,7 @@ func Serve(ctx context.Context, cfg settings.Settings, deps shared.Deps) error {
 	errs := make(chan error, 1)
 
 	go func() {
-		log.Printf("httpapi: serving on %s", cfg.HttpListenAddr)
+		log.Printf("httpserver: serving on %s", cfg.HttpListenAddr)
 		errs <- srv.Serve(listener)
 	}()
 
@@ -44,7 +44,7 @@ func Serve(ctx context.Context, cfg settings.Settings, deps shared.Deps) error {
 		break
 	}
 
-	log.Printf("httpapi: shutting down")
+	log.Printf("httpserver: shutting down")
 	shutDownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 

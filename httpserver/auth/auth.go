@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/paveltessman/jao/auth"
-	"github.com/paveltessman/jao/httpapi/shared"
+	"github.com/paveltessman/jao/httpserver/shared"
 )
 
 type LoginRequest struct {

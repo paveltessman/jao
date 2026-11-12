@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	ErrInvalidToken = errors.New("invalid token")
-	ErrAuthFailed   = errors.New("authentication failed")
+	ErrInvalidToken     = errors.New("invalid token")
+	ErrNotAuthenticated = errors.New("not authenticated")
 )
 
 const (
@@ -63,18 +63,18 @@ func (s *Service) Authenticate(ctx context.Context, accessToken string) (users.U
 
 	user, _, err := s.userFromToken(ctx, accessToken)
 	if err != nil {
-		return users.User{}, fmt.Errorf("%w: %w", ErrAuthFailed, err)
+		return users.User{}, fmt.Errorf("%w: %w", ErrNotAuthenticated, err)
 	}
 
 	if !user.Active {
-		return users.User{}, fmt.Errorf("%w: user is deactivated", ErrAuthFailed)
+		return users.User{}, fmt.Errorf("%w: user is deactivated", ErrNotAuthenticated)
 	}
 
 	user.LastSeen = time.Now()
 
 	err = s.users.Update(ctx, user)
 	if err != nil {
-		return users.User{}, fmt.Errorf("%w: unable to update last seen param for user: %w", ErrAuthFailed, err)
+		return users.User{}, fmt.Errorf("%w: unable to update last seen param for user: %w", ErrNotAuthenticated, err)
 	}
 
 	return user, nil
@@ -83,7 +83,7 @@ func (s *Service) Authenticate(ctx context.Context, accessToken string) (users.U
 func (s *Service) Login(ctx context.Context, username, passwd string) (users.User, Tokens, error) {
 	user, err := s.users.SelectByName(ctx, username)
 	if err != nil {
-		return users.User{}, Tokens{}, fmt.Errorf("%w: unable to find user with provided username", ErrAuthFailed)
+		return users.User{}, Tokens{}, fmt.Errorf("%w: unable to find user with provided username", ErrNotAuthenticated)
 	}
 
 	matched, err := password.Verify(passwd, user.PassHash)
@@ -92,11 +92,11 @@ func (s *Service) Login(ctx context.Context, username, passwd string) (users.Use
 	}
 
 	if !matched {
-		return users.User{}, Tokens{}, fmt.Errorf("%w: incorrect password", ErrAuthFailed)
+		return users.User{}, Tokens{}, fmt.Errorf("%w: incorrect password", ErrNotAuthenticated)
 	}
 
 	if !user.Active {
-		return users.User{}, Tokens{}, fmt.Errorf("%w: user is deactivated", ErrAuthFailed)
+		return users.User{}, Tokens{}, fmt.Errorf("%w: user is deactivated", ErrNotAuthenticated)
 	}
 
 	tokens, err := s.newTokenPair(ctx, user)
@@ -108,15 +108,15 @@ func (s *Service) Refresh(ctx context.Context, oldRefreshToken string) (Tokens, 
 
 	user, oldClaims, err := s.userFromToken(ctx, oldRefreshToken)
 	if err != nil {
-		return Tokens{}, fmt.Errorf("%w: %w", ErrAuthFailed, err)
+		return Tokens{}, fmt.Errorf("%w: %w", ErrNotAuthenticated, err)
 	}
 
 	if oldClaims.ID != user.RefreshTokenID {
-		return Tokens{}, fmt.Errorf("%w: refresh token id does not match provided jti", ErrAuthFailed)
+		return Tokens{}, fmt.Errorf("%w: refresh token id does not match provided jti", ErrNotAuthenticated)
 	}
 
 	if !user.Active {
-		return Tokens{}, fmt.Errorf("%w: user is deactivated", ErrAuthFailed)
+		return Tokens{}, fmt.Errorf("%w: user is deactivated", ErrNotAuthenticated)
 	}
 
 	tokens, err := s.newTokenPair(ctx, user)

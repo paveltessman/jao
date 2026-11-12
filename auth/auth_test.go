@@ -144,7 +144,7 @@ func TestAuthenticateWithExpiredToken(t *testing.T) {
 	svc := NewService(usersRepo, "opa")
 
 	_, err := svc.Authenticate(t.Context(), expiredTokenForUser(t, svc, expectedUser.ID, uuid.New()))
-	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "expired") {
+	if !errors.Is(err, ErrNotAuthenticated) && !strings.Contains(err.Error(), "expired") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
 }
@@ -159,7 +159,7 @@ func TestAuthenticateWithInvalidToken(t *testing.T) {
 	svc := NewService(usersRepo, "opa")
 
 	_, err := svc.Authenticate(t.Context(), "opa opa")
-	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "malformed") {
+	if !errors.Is(err, ErrNotAuthenticated) && !strings.Contains(err.Error(), "malformed") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
 }
@@ -174,7 +174,7 @@ func TestAuthenticateWithDeactivatedUser(t *testing.T) {
 	svc := NewService(usersRepo, "opa")
 
 	_, err := svc.Authenticate(t.Context(), validTokenForUser(t, svc, expectedUser.ID, uuid.New()))
-	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "deactivated") {
+	if !errors.Is(err, ErrNotAuthenticated) && !strings.Contains(err.Error(), "deactivated") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
 }
@@ -190,7 +190,7 @@ func TestAuthenticateWithWithNonexistentUser(t *testing.T) {
 	svc := NewService(usersRepo, "opa")
 
 	_, err := svc.Authenticate(t.Context(), validTokenForUser(t, svc, uuid.New(), uuid.New()))
-	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "opa x2") {
+	if !errors.Is(err, ErrNotAuthenticated) && !strings.Contains(err.Error(), "opa x2") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
 }
@@ -237,7 +237,7 @@ func TestAuthenticateHandlesErrorOnLastSeenUpdate(t *testing.T) {
 	svc := NewService(usersRepo, "opa")
 
 	_, err := svc.Authenticate(t.Context(), validTokenForUser(t, svc, expectedUser.ID, uuid.New()))
-	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "fuk") {
+	if !errors.Is(err, ErrNotAuthenticated) && !strings.Contains(err.Error(), "fuk") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
 }
@@ -276,7 +276,7 @@ func TestLoginWithInvalidPassword(t *testing.T) {
 	svc := NewService(usersRepo, "opa")
 
 	loadedUser, _, err := svc.Login(t.Context(), "username", "password2")
-	if !errors.Is(err, ErrAuthFailed) {
+	if !errors.Is(err, ErrNotAuthenticated) {
 		t.Fatalf("expected auth err, got something else: %v", err)
 	}
 
@@ -298,7 +298,7 @@ func TestLoginWithInactiveUser(t *testing.T) {
 	svc := NewService(usersRepo, "opa")
 
 	loadedUser, _, err := svc.Login(t.Context(), "username", "password")
-	if !errors.Is(err, ErrAuthFailed) {
+	if !errors.Is(err, ErrNotAuthenticated) {
 		t.Fatalf("expected auth err, got something else: %v", err)
 	}
 
@@ -360,7 +360,7 @@ func TestRefreshWithExpiredToken(t *testing.T) {
 	svc := NewService(usersRepo, "opa")
 
 	_, err := svc.Refresh(t.Context(), expiredTokenForUser(t, svc, user.ID, uuid.New()))
-	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "expired") {
+	if !errors.Is(err, ErrNotAuthenticated) && !strings.Contains(err.Error(), "expired") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
 }
@@ -377,7 +377,7 @@ func TestRefreshWithInvalidToken(t *testing.T) {
 	svc := NewService(usersRepo, "opa")
 
 	_, err := svc.Refresh(t.Context(), "opa opa")
-	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "malformed") {
+	if !errors.Is(err, ErrNotAuthenticated) && !strings.Contains(err.Error(), "malformed") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
 }
@@ -394,7 +394,7 @@ func TestRefreshWithDeactivatedUser(t *testing.T) {
 	svc := NewService(usersRepo, "opa")
 
 	_, err := svc.Refresh(t.Context(), validTokenForUser(t, svc, user.ID, refreshTokenID))
-	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "deactivated") {
+	if !errors.Is(err, ErrNotAuthenticated) && !strings.Contains(err.Error(), "deactivated") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
 }
@@ -410,7 +410,7 @@ func TestRefreshWithNonExistentUser(t *testing.T) {
 	svc := NewService(usersRepo, "opa")
 
 	_, err := svc.Refresh(t.Context(), validTokenForUser(t, svc, uuid.New(), uuid.New()))
-	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "opa x2") {
+	if !errors.Is(err, ErrNotAuthenticated) && !strings.Contains(err.Error(), "opa x2") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
 }
@@ -476,7 +476,7 @@ func TestRefreshWithIncorrectTokenID(t *testing.T) {
 	svc := NewService(usersRepo, "opa")
 
 	_, err := svc.Refresh(t.Context(), validTokenForUser(t, svc, user.ID, uuid.New()))
-	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "jti") {
+	if !errors.Is(err, ErrNotAuthenticated) && !strings.Contains(err.Error(), "jti") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
 }

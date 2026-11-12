@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 
-	"github.com/paveltessman/jao/httpapi"
-	"github.com/paveltessman/jao/httpapi/shared"
+	"github.com/paveltessman/jao/auth"
+	"github.com/paveltessman/jao/db"
+	"github.com/paveltessman/jao/db/repos/users"
+	"github.com/paveltessman/jao/httpserver"
+	"github.com/paveltessman/jao/httpserver/shared"
 	"github.com/paveltessman/jao/keys"
 	"github.com/paveltessman/jao/settings"
 )
@@ -21,9 +24,15 @@ func runServe(ctx context.Context, cfg settings.Settings, args []string) error {
 	}
 	defer closeFn()
 
+	db, err := db.New()
+	if err != nil {
+		return err
+	}
+
 	deps := shared.NewDeps(
 		keys.NewService(ctr, cfg.PublicHost),
+		auth.NewService(users.New(db), cfg.SecretKey),
 	)
 
-	return httpapi.Serve(ctx, cfg, deps)
+	return httpserver.Serve(ctx, cfg, deps)
 }

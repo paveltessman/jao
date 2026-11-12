@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 	"uuid"
 
@@ -79,8 +78,6 @@ func (r *Repo) Update(ctx context.Context, user users.User) error {
 		UpdatedAt:      time.Now(),
 		ID:             user.ID.String(),
 	}
-
-	log.Println(args.Active)
 
 	err := r.queries.UserUpdate(ctx, args)
 	if err != nil {

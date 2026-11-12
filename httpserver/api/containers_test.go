@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/paveltessman/jao/httpapi/shared"
+	"github.com/paveltessman/jao/httpserver/shared"
 	"github.com/paveltessman/jao/keys"
 	keystest "github.com/paveltessman/jao/testkit/keys"
 )

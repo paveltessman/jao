@@ -37,7 +37,7 @@ func selectByID(t *testing.T, repo *Repo, id uuid.UUID) users.User {
 	return user
 }
 
-func TestInsertSelect(t *testing.T) {
+func TestInsertSelectByID(t *testing.T) {
 
 	repo := New(migrations.DBForTestsWithMigrations(t))
 
@@ -46,6 +46,24 @@ func TestInsertSelect(t *testing.T) {
 	insert(t, repo, insertedUser)
 
 	loadedUser := selectByID(t, repo, insertedUser.ID)
+
+	if loadedUser != insertedUser {
+		t.Errorf("inserted and loaded users do not match: loaded=%v, inserted=%v", loadedUser, insertedUser)
+	}
+}
+
+func TestInsertSelectByName(t *testing.T) {
+
+	repo := New(migrations.DBForTestsWithMigrations(t))
+
+	insertedUser := newUser()
+
+	insert(t, repo, insertedUser)
+
+	loadedUser, err := repo.SelectByName(t.Context(), insertedUser.Name)
+	if err != nil {
+		t.Fatalf("error when selecting user by name: %v", err)
+	}
 
 	if loadedUser != insertedUser {
 		t.Errorf("inserted and loaded users do not match: loaded=%v, inserted=%v", loadedUser, insertedUser)

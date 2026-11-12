@@ -50,7 +50,17 @@ func (r *Repo) Insert(ctx context.Context, user users.User) error {
 
 func (r *Repo) SelectByID(ctx context.Context, id uuid.UUID) (users.User, error) {
 
-	u, err := r.queries.UserGetByID(ctx, id.String())
+	u, err := r.queries.UserSelectByID(ctx, id.String())
+	if err != nil {
+		return users.User{}, fmt.Errorf("%w: %w", dbtools.ErrDb, err)
+	}
+
+	return sqlcToUser(u)
+}
+
+func (r *Repo) SelectByName(ctx context.Context, name string) (users.User, error) {
+
+	u, err := r.queries.UserSelectByName(ctx, name)
 	if err != nil {
 		return users.User{}, fmt.Errorf("%w: %w", dbtools.ErrDb, err)
 	}

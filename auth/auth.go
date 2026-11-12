@@ -23,6 +23,7 @@ const (
 
 type UsersRepo interface {
 	SelectByID(ctx context.Context, ID uuid.UUID) (users.User, error)
+	SelectByName(ctx context.Context, name string) (users.User, error)
 	Update(ctx context.Context, user users.User) error
 }
 

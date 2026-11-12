@@ -25,6 +25,10 @@ func (r *fakeUsersRepo) SelectByID(ctx context.Context, ID uuid.UUID) (users.Use
 	return r.onSelectUser, r.errOnSelectUser
 }
 
+func (r *fakeUsersRepo) SelectByName(ctx context.Context, name string) (users.User, error) {
+	return r.onSelectUser, r.errOnSelectUser
+}
+
 func (r *fakeUsersRepo) Update(ctx context.Context, user users.User) error {
 	r.updateCallArgs = append(r.updateCallArgs, user)
 	return r.onUpdateErr

@@ -9,6 +9,7 @@ import (
 	"uuid"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/paveltessman/jao/password"
 	"github.com/paveltessman/jao/users"
 )
 
@@ -32,6 +33,17 @@ func (r *fakeUsersRepo) SelectByName(ctx context.Context, name string) (users.Us
 func (r *fakeUsersRepo) Update(ctx context.Context, user users.User) error {
 	r.updateCallArgs = append(r.updateCallArgs, user)
 	return r.onUpdateErr
+}
+
+func setPasswdHash(t *testing.T, user *users.User, passwd string) {
+	t.Helper()
+
+	passwdHash, err := password.Hash(passwd)
+	if err != nil {
+		t.Fatalf("unable to create password hash: %v", err)
+	}
+
+	user.PassHash = passwdHash
 }
 
 func userIDFromTokenString(t *testing.T, tokenString string, svc *Service) string {
@@ -228,6 +240,98 @@ func TestAuthenticateHandlesErrorOnLastSeenUpdate(t *testing.T) {
 	if !errors.Is(err, ErrAuthFailed) && !strings.Contains(err.Error(), "fuk") {
 		t.Fatalf("expected auth error, got something else: %v", err)
 	}
+}
+
+func TestLoginWithValidPassword(t *testing.T) {
+
+	user := newUser()
+	user.Active = true
+	setPasswdHash(t, &user, "password")
+
+	usersRepo := &fakeUsersRepo{
+		onSelectUser: user,
+	}
+	svc := NewService(usersRepo, "opa")
+
+	loadedUser, _, err := svc.Login(t.Context(), "username", "password")
+	if err != nil {
+		t.Fatalf("unable to log in: %v", err)
+	}
+
+	if loadedUser != user {
+		t.Fatalf("users don't match")
+	}
+
+}
+
+func TestLoginWithInvalidPassword(t *testing.T) {
+
+	user := newUser()
+	user.Active = true
+	setPasswdHash(t, &user, "password")
+
+	usersRepo := &fakeUsersRepo{
+		onSelectUser: user,
+	}
+	svc := NewService(usersRepo, "opa")
+
+	loadedUser, _, err := svc.Login(t.Context(), "username", "password2")
+	if !errors.Is(err, ErrAuthFailed) {
+		t.Fatalf("expected auth err, got something else: %v", err)
+	}
+
+	if loadedUser == user {
+		t.Fatalf("users must not match")
+	}
+
+}
+
+func TestLoginWithInactiveUser(t *testing.T) {
+
+	user := newUser()
+	user.Active = false
+	setPasswdHash(t, &user, "password")
+
+	usersRepo := &fakeUsersRepo{
+		onSelectUser: user,
+	}
+	svc := NewService(usersRepo, "opa")
+
+	loadedUser, _, err := svc.Login(t.Context(), "username", "password")
+	if !errors.Is(err, ErrAuthFailed) {
+		t.Fatalf("expected auth err, got something else: %v", err)
+	}
+
+	if loadedUser == user {
+		t.Fatalf("users must not match")
+	}
+
+}
+
+func TestLoginGivesCorrectTokens(t *testing.T) {
+
+	user := newUser()
+	user.Active = true
+	setPasswdHash(t, &user, "password")
+
+	usersRepo := &fakeUsersRepo{
+		onSelectUser: user,
+	}
+	svc := NewService(usersRepo, "opa")
+
+	_, tokens, err := svc.Login(t.Context(), "username", "password")
+	if err != nil {
+		t.Fatalf("unable to log in: %v", err)
+	}
+
+	if !tokenContainsUserID(t, svc, tokens.Access, user.ID) {
+		t.Errorf("access token has incorrect user id: got=%q, want=%q", tokens.Access, user.ID)
+	}
+
+	if !tokenContainsUserID(t, svc, tokens.Refresh, user.ID) {
+		t.Errorf("refresh token has incorrect user id: got=%q, want=%q", tokens.Access, user.ID)
+	}
+
 }
 
 func TestRefreshWithValidToken(t *testing.T) {

@@ -8,6 +8,7 @@ import (
 	"uuid"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/paveltessman/jao/password"
 	"github.com/paveltessman/jao/users"
 )
 
@@ -77,6 +78,30 @@ func (s *Service) Authenticate(ctx context.Context, accessToken string) (users.U
 	}
 
 	return user, nil
+}
+
+func (s *Service) Login(ctx context.Context, username, passwd string) (users.User, Tokens, error) {
+	user, err := s.users.SelectByName(ctx, username)
+	if err != nil {
+		return users.User{}, Tokens{}, fmt.Errorf("%w: unable to find user with provided username", ErrAuthFailed)
+	}
+
+	matched, err := password.Verify(passwd, user.PassHash)
+	if err != nil {
+		return users.User{}, Tokens{}, err
+	}
+
+	if !matched {
+		return users.User{}, Tokens{}, fmt.Errorf("%w: incorrect password", ErrAuthFailed)
+	}
+
+	if !user.Active {
+		return users.User{}, Tokens{}, fmt.Errorf("%w: user is deactivated", ErrAuthFailed)
+	}
+
+	tokens, err := s.newTokenPair(ctx, user)
+
+	return user, tokens, err
 }
 
 func (s *Service) Refresh(ctx context.Context, oldRefreshToken string) (Tokens, error) {

@@ -87,6 +87,7 @@ func setRefreshCookie(w http.ResponseWriter, value string) {
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
+		Path:     "/auth/refresh",
 	})
 
 }

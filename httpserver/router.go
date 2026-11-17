@@ -14,8 +14,8 @@ func mainRoute(deps shared.Deps) http.Handler {
 	mux := http.NewServeMux()
 
 	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", middleware.Auth(deps.AuthService, api.Route(deps))))
-	mux.Handle("/ui/", http.StripPrefix("/ui", ui.Route()))
 	mux.Handle("/auth/", http.StripPrefix("/auth", auth.Route(deps)))
+	mux.Handle("/", ui.Route())
 
 	return mux
 }

@@ -1,7 +1,7 @@
-import Image from "next/image";
+import { ContainerList } from "@/components/container-list";
 
 export default function Home() {
     return (
-        <p>helow</p>
+        <ContainerList />
     );
 }

@@ -47,7 +47,7 @@ export function LoginForm({
                 throw new Error(data.message || "Invalid username or password")
             }
 
-            window.location.href = "/ui"
+            window.location.href = "/"
 
         } catch (err: any) {
             setError(err.message || "Something went wrong");

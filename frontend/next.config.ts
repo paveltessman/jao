@@ -4,7 +4,6 @@ const nextConfig: NextConfig = {
     /* config options here */
     output: "export",
     trailingSlash: true,
-    basePath: "/ui",
     turbopack: {
         rules: {
             "*.css": {
@@ -13,6 +12,18 @@ const nextConfig: NextConfig = {
             },
         },
     },
+    async rewrites() {
+        return [
+            {
+                source: "/api/:path*",
+                destination: `http://localhost:8001/api/:path*`,
+            },
+            {
+                source: "/auth/:path*",
+                destination: `http://localhost:8001/auth/:path*`,
+            },
+        ]
+    }
 };
 
 export default nextConfig;

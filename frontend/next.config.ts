@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
     /* config options here */
     output: "export",
-    basePath: "/ui",
+    trailingSlash: true,
     turbopack: {
         rules: {
             "*.css": {
@@ -12,6 +12,18 @@ const nextConfig: NextConfig = {
             },
         },
     },
+    async rewrites() {
+        return [
+            {
+                source: "/api/:path*",
+                destination: `http://localhost:8001/api/:path*`,
+            },
+            {
+                source: "/auth/:path*",
+                destination: `http://localhost:8001/auth/:path*`,
+            },
+        ]
+    }
 };
 
 export default nextConfig;
